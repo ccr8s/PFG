@@ -53,6 +53,11 @@ class DetailPanel(ctk.CTkFrame):
         self._current_result: Optional[ScanResult] = None
         self._active_detonation: Optional[Detonation] = None
 
+        # Action bar: stack buttons vertically with fill="x" so they
+        # always fit, regardless of how narrow the user has dragged the
+        # detail panel splitter. A horizontal row of 3 fixed-width
+        # buttons (140+170+180 px) gets clipped off the right edge when
+        # the panel is at its default 350 px width.
         self.action_bar = ctk.CTkFrame(self, fg_color="transparent")
         self.action_bar.pack(fill="x", padx=6, pady=(4, 6))
 
@@ -61,9 +66,9 @@ class DetailPanel(ctk.CTkFrame):
             text="Preview (safe)",
             command=self._on_preview,
             state="disabled",
-            width=140,
+            height=32,
         )
-        self.btn_preview.pack(side="left", padx=(0, 6))
+        self.btn_preview.pack(fill="x", pady=(0, 4))
 
         self.btn_hex = ctk.CTkButton(
             self.action_bar,
@@ -72,9 +77,9 @@ class DetailPanel(ctk.CTkFrame):
             state="disabled",
             fg_color="#2980b9",
             hover_color="#1f618d",
-            width=170,
+            height=32,
         )
-        self.btn_hex.pack(side="left", padx=(0, 6))
+        self.btn_hex.pack(fill="x", pady=(0, 4))
         ToolTip(
             self.btn_hex,
             "Open the file in a hex editor (read bytes only - no code "
@@ -89,9 +94,9 @@ class DetailPanel(ctk.CTkFrame):
             state="disabled",
             fg_color="#a93226",
             hover_color="#7b241c",
-            width=180,
+            height=32,
         )
-        self.btn_detonate.pack(side="left")
+        self.btn_detonate.pack(fill="x")
 
         self._sandbox_available = is_sandbox_available()
         self._sandbox_reason = (

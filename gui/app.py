@@ -10,6 +10,7 @@ Main window built with CustomTkinter following the wireframe layout:
 
 import logging
 import threading
+import tkinter as tk
 from pathlib import Path
 from tkinter import filedialog, messagebox
 from typing import Any, Dict, List, Optional
@@ -42,10 +43,11 @@ class FileGuardApp(ctk.CTk):
         ctk.set_default_color_theme("blue")
 
         self.title("FileGuard v1.0 - Security Scanner")
-        self.geometry(
-            f"{DIMENSIONS['window_min_width']}x{DIMENSIONS['window_min_height']}"
-        )
         self.minsize(
+            DIMENSIONS["window_min_width"],
+            DIMENSIONS["window_min_height"],
+        )
+        self._center_window(
             DIMENSIONS["window_min_width"],
             DIMENSIONS["window_min_height"],
         )
@@ -82,6 +84,24 @@ class FileGuardApp(ctk.CTk):
         # Catch the X button so we can terminate any active sandbox
         # and wipe its staging dir before exiting.
         self.protocol("WM_DELETE_WINDOW", self._on_close_window)
+
+    # ── Window geometry ────────────────────────────────────────
+
+    def _center_window(self, width: int, height: int) -> None:
+        """Place the window centered on the active screen.
+
+        Falls back to a corner placement on the rare TclError. Clamps
+        to the visible screen area so the title bar can never end up
+        off-screen on weird multi-monitor setups.
+        """
+        try:
+            screen_w = self.winfo_screenwidth()
+            screen_h = self.winfo_screenheight()
+            x = max((screen_w - width) // 2, 0)
+            y = max((screen_h - height) // 2, 0)
+            self.geometry(f"{width}x{height}+{x}+{y}")
+        except tk.TclError:
+            self.geometry(f"{width}x{height}")
 
     # ── Toolbar ────────────────────────────────────────────────
 
