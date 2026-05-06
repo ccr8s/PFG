@@ -61,6 +61,7 @@ data/*.db
 data/*.sqlite*
 data/known_hashes.db
 data/.fileguard_decoys.json
+data/user_prefs.json
 
 # Honeypot manifest written at runtime
 .fileguard_decoys.json

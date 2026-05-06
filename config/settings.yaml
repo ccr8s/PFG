@@ -118,6 +118,17 @@ safety:
   testing_mode: false
   read_only: true
 
+# External tools
+#
+# hex_editor_path (default: "")
+#   Absolute path to a hex editor executable. Empty value tells
+#   FileGuard to auto-detect HxD, ImHex, or 010 Editor on Windows.
+#   Override per-user without editing this file by setting the env
+#   var FILEGUARD_HEX_EDITOR or by clicking "Browse for hex editor"
+#   in the GUI (saves to data/user_prefs.json, which is gitignored).
+tools:
+  hex_editor_path: ""
+
 # GUI settings
 gui:
   theme: "dark"

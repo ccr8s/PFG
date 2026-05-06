@@ -1,6 +1,7 @@
 """FileGuard GUI custom widgets."""
 
 from gui.widgets.detail_panel import DetailPanel
+from gui.widgets.hex_editor_dialog import HexEditorPickerDialog
 from gui.widgets.honeypot_alerts_tab import HoneypotAlertsTab
 from gui.widgets.honeypot_tab import HoneypotTab
 from gui.widgets.info_popup import InfoPopup
@@ -29,6 +30,7 @@ def use_hand_cursor(*widgets) -> None:
 
 __all__ = [
     "DetailPanel",
+    "HexEditorPickerDialog",
     "HoneypotAlertsTab",
     "HoneypotTab",
     "InfoPopup",

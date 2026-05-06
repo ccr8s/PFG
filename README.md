@@ -149,7 +149,7 @@ Or flip `safety.testing_mode: true` in `config/settings.yaml` to make it the per
 
 ## Reviewing flagged files safely
 
-When the GUI flags a file, **don't** just open it. Even a "harmless" double-click can trigger Explorer preview handlers that parse the file with the same buggy code that made it suspicious in the first place. FileGuard ships two built-in alternatives:
+When the GUI flags a file, **don't** just open it. Even a "harmless" double-click can trigger Explorer preview handlers that parse the file with the same buggy code that made it suspicious in the first place. FileGuard ships three built-in alternatives:
 
 ### Preview (safe) — always available
 
@@ -160,6 +160,19 @@ The detail panel's **Preview (safe)** button opens a read-only window with three
 - **PE Headers** — only shown for PE files; lists machine, sections (with entropy), and imports, with notable Windows API calls highlighted.
 
 This view never invokes a Windows shell handler, never spawns a subprocess on the file, and never decodes the bytes into objects with side effects. The worst it can do is render garbled text.
+
+### Open in hex editor — for deeper byte-level inspection
+
+The blue **Open in hex editor** button hands the file off to a real hex editor running as a separate process. Opening a file in a hex editor is safe because hex editors only read bytes — they don't execute the file, run macros, or render scripts. Caveat: the editor opens the file with write permissions, so the file stays unchanged on disk *unless you click Save in the editor.*
+
+FileGuard tries to find an editor in this order:
+
+1. `FILEGUARD_HEX_EDITOR` environment variable
+2. `data/user_prefs.json` (saved when you click *Browse for .exe...* in the picker)
+3. `tools.hex_editor_path` in `config/settings.yaml`
+4. Auto-detect [HxD](https://mh-nexus.de/en/hxd/), [ImHex](https://imhex.werwolv.net/), or [010 Editor](https://www.sweetscape.com/010editor/) at common install paths or on `PATH`
+
+If none is found, a picker dialog offers Download buttons for each option plus a *Browse for .exe...* button so you can point at any other hex editor you already use.
 
 ### Detonate in Sandbox — Pro / Enterprise / Education only
 

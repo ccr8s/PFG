@@ -8,9 +8,11 @@ import customtkinter as ctk
 from core.models import ScanResult
 from gui.knowledge_base import get_technique_info
 from gui.styles import COLORS, DIMENSIONS, FONTS, RISK_DISPLAY
+from gui.widgets.hex_editor_dialog import HexEditorPickerDialog
 from gui.widgets.info_popup import InfoPopup
 from gui.widgets.preview_window import SafePreviewWindow
 from gui.widgets.tooltip import ToolTip
+from utils.hex_editor import find_editor, open_in_hex_editor
 from utils.sandbox_launcher import (
     Detonation,
     SandboxUnavailableError,
@@ -63,6 +65,23 @@ class DetailPanel(ctk.CTkFrame):
         )
         self.btn_preview.pack(side="left", padx=(0, 6))
 
+        self.btn_hex = ctk.CTkButton(
+            self.action_bar,
+            text="Open in hex editor",
+            command=self._on_open_hex,
+            state="disabled",
+            fg_color="#2980b9",
+            hover_color="#1f618d",
+            width=170,
+        )
+        self.btn_hex.pack(side="left", padx=(0, 6))
+        ToolTip(
+            self.btn_hex,
+            "Open the file in a hex editor (read bytes only - no code "
+            "is executed). The file stays unchanged on disk unless you "
+            "click Save in the editor.",
+        )
+
         self.btn_detonate = ctk.CTkButton(
             self.action_bar,
             text="Detonate in Sandbox",
@@ -81,7 +100,7 @@ class DetailPanel(ctk.CTkFrame):
         if self._sandbox_reason is not None:
             ToolTip(self.btn_detonate, self._sandbox_reason)
 
-        for btn in (self.btn_preview, self.btn_detonate):
+        for btn in (self.btn_preview, self.btn_hex, self.btn_detonate):
             target = getattr(btn, "_canvas", btn)
             try:
                 target.configure(cursor="hand2")
@@ -98,6 +117,7 @@ class DetailPanel(ctk.CTkFrame):
         self._current_result = result
 
         self.btn_preview.configure(state="normal")
+        self.btn_hex.configure(state="normal")
         # Don't blindly re-enable Detonate while a sandbox is already
         # running - keep it pinned in the "Close Sandbox" state until
         # the user dismisses or the watcher reverts it.
@@ -256,6 +276,7 @@ class DetailPanel(ctk.CTkFrame):
         self.detail_text.delete("1.0", "end")
         self._current_result = None
         self.btn_preview.configure(state="disabled")
+        self.btn_hex.configure(state="disabled")
         # Keep Close Sandbox visible/enabled if a detonation is still
         # in flight - the user might have just kicked off a scan but
         # the sandbox VM is still running from earlier.
@@ -273,6 +294,33 @@ class DetailPanel(ctk.CTkFrame):
         except Exception as exc:
             logger.exception("Safe preview failed")
             self._show_error("Preview failed", str(exc))
+
+    def _on_open_hex(self) -> None:
+        """Open the current file in an external hex editor.
+
+        If no editor is configured or auto-detected, show the picker
+        dialog so the user can install one or browse for an .exe.
+        """
+        if self._current_result is None:
+            return
+
+        editor = find_editor()
+        if editor is None:
+            HexEditorPickerDialog(
+                self.winfo_toplevel(),
+                on_chosen=lambda _p: self._launch_hex(),
+            )
+            return
+        self._launch_hex(editor)
+
+    def _launch_hex(self, editor: Optional[Any] = None) -> None:
+        if self._current_result is None:
+            return
+        ok, msg = open_in_hex_editor(
+            self._current_result.file_path, editor=editor
+        )
+        if not ok:
+            self._show_error("Hex editor", msg)
 
     def _on_detonate(self) -> None:
         """Confirm and launch Windows Sandbox detonation.

@@ -8,6 +8,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Open-in-hex-editor button on the file detail panel. The blue
+  `Open in hex editor` button hands the selected file to a real
+  hex editor running as a separate process (safe: hex editors
+  read bytes, don't execute). New `utils/hex_editor.py` resolves
+  the editor in priority order: `FILEGUARD_HEX_EDITOR` env var,
+  `data/user_prefs.json` (`hex_editor_path`), `config/settings.yaml`
+  (`tools.hex_editor_path`), then auto-detection of HxD, ImHex, or
+  010 Editor in common Program Files paths and on `PATH`. If none
+  is found, a new `HexEditorPickerDialog` lists detected editors,
+  offers download buttons for missing ones, and includes a
+  `Browse for .exe...` picker that pins a custom editor for future
+  sessions. Launches via `subprocess.Popen([editor, file])` -
+  list argv, never `shell=True`. New tests in
+  `tests/test_hex_editor.py` cover the resolution chain, list-argv
+  invocation, file-path validation, and prefs round-trip.
+
 - Dedicated `Honeypot Alerts` tab next to the `Honeypot` tab.
   Alerts now stream into their own screen instead of squeezing
   beneath the tutorial. The tab title includes an unread counter
