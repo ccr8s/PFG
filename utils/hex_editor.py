@@ -49,11 +49,23 @@ class EditorSpec:
 
 
 def _expand_program_files() -> List[Path]:
+    """Common roots where editors may be installed.
+
+    Covers system-wide installs (``ProgramFiles*``) and per-user
+    installs done without admin (``%LOCALAPPDATA%\\Programs``,
+    ``%LOCALAPPDATA%`` directly). HxD in particular can end up in
+    any of these depending on installer mode.
+    """
     candidates: List[Path] = []
     for env_var in ("ProgramFiles", "ProgramFiles(x86)", "ProgramW6432"):
         value = os.environ.get(env_var)
         if value:
             candidates.append(Path(value))
+    local_appdata = os.environ.get("LOCALAPPDATA")
+    if local_appdata:
+        local = Path(local_appdata)
+        candidates.append(local / "Programs")
+        candidates.append(local)
     return candidates
 
 

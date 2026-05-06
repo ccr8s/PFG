@@ -41,7 +41,7 @@ class HexEditorPickerDialog(tk.Toplevel):
         self._editors: List[dict] = available_editors()
 
         self._build()
-        self._center_on(master)
+        self._center_on_screen()
 
     # ------------------------------------------------------------------
     # Layout
@@ -228,20 +228,28 @@ class HexEditorPickerDialog(tk.Toplevel):
     # ------------------------------------------------------------------
     # Helpers
     # ------------------------------------------------------------------
-    def _center_on(self, master: Any) -> None:
+    def _center_on_screen(self) -> None:
+        """Size the dialog to its packed contents and center on screen.
+
+        Just calling ``geometry("+x+y")`` only sets position, leaving
+        Tk to size the Toplevel based on whatever width/height it has
+        already settled on - which on first map can be 1x1, producing
+        an apparently empty dialog. We force a layout pass with
+        ``update_idletasks``, then read ``winfo_reqwidth/height`` for
+        the natural size, clamp to a sensible minimum, and pass both
+        size and position to ``geometry`` in one call.
+        """
         try:
             self.update_idletasks()
-            mx = master.winfo_rootx()
-            my = master.winfo_rooty()
-            mw = master.winfo_width() or 800
-            mh = master.winfo_height() or 600
-            w = self.winfo_width() or 600
-            h = self.winfo_height() or 400
-            x = mx + (mw - w) // 2
-            y = my + (mh - h) // 2
-            self.geometry(f"+{max(x, 0)}+{max(y, 0)}")
+            w = max(self.winfo_reqwidth(), 600)
+            h = max(self.winfo_reqheight(), 360)
+            sw = self.winfo_screenwidth()
+            sh = self.winfo_screenheight()
+            x = max((sw - w) // 2, 0)
+            y = max((sh - h) // 2, 0)
+            self.geometry(f"{w}x{h}+{x}+{y}")
         except tk.TclError:
-            pass
+            self.geometry("600x420")
 
 
 __all__ = ["HexEditorPickerDialog"]
