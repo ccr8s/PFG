@@ -81,6 +81,13 @@ class DetailPanel(ctk.CTkFrame):
         if self._sandbox_reason is not None:
             ToolTip(self.btn_detonate, self._sandbox_reason)
 
+        for btn in (self.btn_preview, self.btn_detonate):
+            target = getattr(btn, "_canvas", btn)
+            try:
+                target.configure(cursor="hand2")
+            except Exception:
+                pass
+
         self._link_counter = 0
 
     def show(self, result: ScanResult) -> None:

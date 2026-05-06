@@ -17,7 +17,6 @@ from __future__ import annotations
 import logging
 import threading
 import tkinter as tk
-from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -66,18 +65,36 @@ _TUTORIAL = [
 class HoneypotTab(tk.Frame):
     """Top-level frame for the Honeypot tab body."""
 
-    def __init__(self, master: Any) -> None:
+    def __init__(
+        self,
+        master: Any,
+        on_alert: Optional[Any] = None,
+        on_monitor_state: Optional[Any] = None,
+    ) -> None:
+        """Create the Honeypot management tab.
+
+        Args:
+            master: parent widget.
+            on_alert: optional callback ``(alert) -> None`` invoked on
+                each :class:`HoneypotAlert` from the watchdog thread.
+                Implementation must be thread-safe (e.g. marshal onto
+                Tk main thread). FileGuardApp wires this to the
+                HoneypotAlertsTab.
+            on_monitor_state: optional callback
+                ``(monitoring: bool, message: str) -> None`` so the
+                alerts tab can mirror state changes.
+        """
         super().__init__(master, bg="#1a1a2e")
 
         self._selected_decoys: Optional[List[Dict[str, Any]]] = None
         self._busy = False
         self._monitor: Any = None
-        self._alert_count = 0
+        self._on_alert_external = on_alert
+        self._on_monitor_state = on_monitor_state
 
         self._build_tutorial()
         self._build_action_bar()
         self._build_status()
-        self._build_alerts_panel()
 
         self.refresh_status()
 
@@ -150,6 +167,7 @@ class HoneypotTab(tk.Frame):
             activeforeground="#ffffff",
             font=("Segoe UI", 10, "bold"),
             relief="flat",
+            cursor="hand2",
             padx=12,
             pady=6,
         )
@@ -165,6 +183,7 @@ class HoneypotTab(tk.Frame):
             activeforeground="#ffffff",
             font=("Segoe UI", 10, "bold"),
             relief="flat",
+            cursor="hand2",
             padx=12,
             pady=6,
         )
@@ -180,6 +199,7 @@ class HoneypotTab(tk.Frame):
             activeforeground="#ffffff",
             font=("Segoe UI", 10, "bold"),
             relief="flat",
+            cursor="hand2",
             padx=12,
             pady=6,
         )
@@ -195,6 +215,7 @@ class HoneypotTab(tk.Frame):
             activeforeground="#ffffff",
             font=("Segoe UI", 10, "bold"),
             relief="flat",
+            cursor="hand2",
             padx=12,
             pady=6,
         )
@@ -232,67 +253,10 @@ class HoneypotTab(tk.Frame):
             wrap="word",
             font=("Consolas", 10),
             cursor="arrow",
-            height=6,
+            height=8,
             state="disabled",
         )
-        self.status_text.pack(fill="both", expand=False, padx=10, pady=(0, 4))
-
-    def _build_alerts_panel(self) -> None:
-        """Live alerts panel populated by the watchdog monitor."""
-        self.lbl_alerts = tk.Label(
-            self,
-            text="Monitoring stopped - 0 alerts",
-            bg="#1a1a2e",
-            fg="#9b9b9b",
-            font=("Segoe UI", 10, "bold"),
-            anchor="w",
-            padx=10,
-            pady=4,
-        )
-        self.lbl_alerts.pack(fill="x")
-
-        wrapper = tk.Frame(self, bg="#1a1a2e")
-        wrapper.pack(fill="both", expand=True, padx=10, pady=(0, 8))
-
-        self.alerts_text = tk.Text(
-            wrapper,
-            bg="#0f1020",
-            fg="#e8e8e8",
-            relief="flat",
-            padx=10,
-            pady=8,
-            wrap="word",
-            font=("Consolas", 10),
-            cursor="arrow",
-            height=6,
-            state="disabled",
-        )
-        scroll = tk.Scrollbar(
-            wrapper, orient="vertical", command=self.alerts_text.yview
-        )
-        self.alerts_text.configure(yscrollcommand=scroll.set)
-        scroll.pack(side="right", fill="y")
-        self.alerts_text.pack(side="left", fill="both", expand=True)
-
-        self.alerts_text.tag_configure(
-            "alert",
-            foreground="#e74c3c",
-            font=("Consolas", 10, "bold"),
-        )
-        self.alerts_text.tag_configure("muted", foreground="#9b9b9b")
-        self._set_alerts_placeholder()
-
-    def _set_alerts_placeholder(self) -> None:
-        self.alerts_text.configure(state="normal")
-        self.alerts_text.delete("1.0", "end")
-        self.alerts_text.insert(
-            "1.0",
-            "No alerts yet. After deploying decoys, click 'Start "
-            "monitoring' above. Alerts will appear here when a "
-            "decoy is modified, created, deleted, or renamed.",
-            "muted",
-        )
-        self.alerts_text.configure(state="disabled")
+        self.status_text.pack(fill="both", expand=True, padx=10, pady=(0, 8))
 
     # ------------------------------------------------------------------
     # Actions
@@ -403,12 +367,13 @@ class HoneypotTab(tk.Frame):
             self.stop_monitoring()
             return
 
-        # Start path. Need at least one deployed decoy to watch.
         try:
             from honeypot.decoy_manager import DecoyManager
             from honeypot.monitor import HoneypotMonitor
         except ImportError as exc:
-            self._show_alert_error(f"Honeypot modules unavailable: {exc}")
+            self._notify_monitor_error(
+                f"Honeypot modules unavailable: {exc}"
+            )
             return
 
         manager = DecoyManager()
@@ -430,11 +395,11 @@ class HoneypotTab(tk.Frame):
             monitor.start()
         except Exception as exc:
             logger.exception("Failed to start honeypot monitor")
-            self._show_alert_error(f"Could not start monitor: {exc}")
+            self._notify_monitor_error(f"Could not start monitor: {exc}")
             return
 
         if not monitor.is_running:
-            self._show_alert_error(
+            self._notify_monitor_error(
                 "Monitor failed to start. Check that the watchdog "
                 "package is installed and that decoy directories "
                 "still exist on disk."
@@ -446,26 +411,23 @@ class HoneypotTab(tk.Frame):
             return
 
         self._monitor = monitor
-        self._alert_count = 0
         self.btn_monitor.configure(
             text="Stop monitoring",
             bg="#a93226",
             activebackground="#7b241c",
         )
-        self.lbl_alerts.configure(
-            text="Monitoring active - 0 alerts",
-            fg="#27ae60",
+        self._set_status_text(
+            f"Monitor started. Watching "
+            f"{len(manager.get_deployed_paths())} decoy file(s). "
+            "Open the 'Honeypot Alerts' tab to see live events."
         )
-        self.alerts_text.configure(state="normal")
-        self.alerts_text.delete("1.0", "end")
-        self.alerts_text.insert(
-            "1.0",
-            f"[{datetime.now().strftime('%H:%M:%S')}] Monitor started. "
-            f"Watching {len(manager.get_deployed_paths())} decoy "
-            "file(s). Alerts will stream into this panel.\n",
-            "muted",
+        self._notify_monitor_state(
+            monitoring=True,
+            message=(
+                f"Monitor started. Watching "
+                f"{len(manager.get_deployed_paths())} decoy file(s)."
+            ),
         )
-        self.alerts_text.configure(state="disabled")
 
     def stop_monitoring(self) -> None:
         """Stop the watchdog monitor; safe to call when not running.
@@ -487,25 +449,11 @@ class HoneypotTab(tk.Frame):
                 bg="#2980b9",
                 activebackground="#1f618d",
             )
-            self.lbl_alerts.configure(
-                text=(
-                    f"Monitoring stopped - {self._alert_count} alert"
-                    f"{'s' if self._alert_count != 1 else ''}"
-                ),
-                fg="#9b9b9b",
-            )
-            self.alerts_text.configure(state="normal")
-            self.alerts_text.insert(
-                "end",
-                f"[{datetime.now().strftime('%H:%M:%S')}] Monitor "
-                "stopped.\n",
-                "muted",
-            )
-            self.alerts_text.see("end")
-            self.alerts_text.configure(state="disabled")
         except tk.TclError:
             # Widget destroyed (app shutting down) - cleanup is fine.
             pass
+
+        self._notify_monitor_state(monitoring=False, message="Monitor stopped.")
 
     def is_monitoring(self) -> bool:
         """Return True if the watchdog monitor is active."""
@@ -513,51 +461,31 @@ class HoneypotTab(tk.Frame):
 
     def _on_alert_from_thread(self, alert: Any) -> None:
         """Watchdog callback - marshal onto Tk main thread."""
+        if self._on_alert_external is None:
+            return
         try:
-            self.after(0, self._render_alert, alert)
+            self.after(0, self._on_alert_external, alert)
         except Exception:
             pass
 
-    def _render_alert(self, alert: Any) -> None:
-        """Append an incoming HoneypotAlert to the alerts panel."""
-        self._alert_count += 1
-        ts = alert.timestamp.strftime("%H:%M:%S") if getattr(
-            alert, "timestamp", None
-        ) else datetime.now().strftime("%H:%M:%S")
-        access = getattr(alert, "access_type", "?")
-        decoy = getattr(alert, "decoy_path", "?")
-        proc = getattr(alert, "process_name", None) or "unknown"
-        pid = getattr(alert, "process_id", None) or "?"
-        user = getattr(alert, "user", None) or "?"
+    def _notify_monitor_state(
+        self, *, monitoring: bool, message: Optional[str] = None
+    ) -> None:
+        if self._on_monitor_state is None:
+            return
+        try:
+            self._on_monitor_state(monitoring, message)
+        except Exception:
+            logger.exception("Honeypot monitor-state callback failed")
 
-        self.alerts_text.configure(state="normal")
-        self.alerts_text.insert(
-            "end",
-            f"[{ts}] {access.upper()} on {decoy}\n",
-            "alert",
-        )
-        self.alerts_text.insert(
-            "end",
-            f"          process: {proc} (pid {pid}) - user: {user}\n",
-            "muted",
-        )
-        self.alerts_text.see("end")
-        self.alerts_text.configure(state="disabled")
-
-        self.lbl_alerts.configure(
-            text=(
-                f"Monitoring active - {self._alert_count} alert"
-                f"{'s' if self._alert_count != 1 else ''}"
-            ),
-            fg="#e74c3c",
-        )
-
-    def _show_alert_error(self, message: str) -> None:
-        self.alerts_text.configure(state="normal")
-        self.alerts_text.delete("1.0", "end")
-        self.alerts_text.insert("1.0", message, "alert")
-        self.alerts_text.configure(state="disabled")
-        self.lbl_alerts.configure(text="Monitoring error", fg="#e74c3c")
+    def _notify_monitor_error(self, message: str) -> None:
+        self._set_status_text(f"Monitor error: {message}")
+        if self._on_monitor_state is None:
+            return
+        try:
+            self._on_monitor_state(False, f"ERROR: {message}")
+        except Exception:
+            pass
 
     # ------------------------------------------------------------------
     # Status refresh
@@ -758,6 +686,7 @@ class DecoyChooser:
             fg="#e8e8e8",
             activebackground="#34495e",
             relief="flat",
+            cursor="hand2",
             font=("Segoe UI", 10, "bold"),
             padx=12,
             pady=6,
@@ -770,6 +699,7 @@ class DecoyChooser:
             fg="#ffffff",
             activebackground="#1e8449",
             relief="flat",
+            cursor="hand2",
             font=("Segoe UI", 10, "bold"),
             padx=12,
             pady=6,

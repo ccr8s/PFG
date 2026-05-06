@@ -8,6 +8,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Dedicated `Honeypot Alerts` tab next to the `Honeypot` tab.
+  Alerts now stream into their own screen instead of squeezing
+  beneath the tutorial. The tab title includes an unread counter
+  (e.g. `Honeypot Alerts (3)`) and pulses between filled / empty
+  bullet markers (`\u25cf` / `\u25cb`) every 700ms while there are
+  unread alerts and the tab is not active. Switching to the tab
+  marks alerts viewed and stops the animation. A `Clear log`
+  button on the tab wipes the panel without affecting the monitor.
+  Alert lines are color-coded by access type (delete / rename = red,
+  modify / create = amber, other = blue). Implemented in
+  `gui/widgets/honeypot_alerts_tab.py`; `HoneypotTab` now routes
+  alerts via injected `on_alert` / `on_monitor_state` callbacks
+  the app wires up in `_on_honeypot_alert` and
+  `_on_tool_tab_changed`.
+
+- Pointer-finger (`hand2`) cursor on every clickable button:
+  toolbar (Start Scan, Stop, Export), detail panel (Preview,
+  Detonate), per-file risk-column entries, all Honeypot controls,
+  the decoy chooser modal, and the `Clear log` button. New
+  `gui.widgets.use_hand_cursor` helper handles both `tk.Button` and
+  `customtkinter.CTkButton` (the latter via its `_canvas` attribute,
+  since CTkButton 5.2.x does not accept `cursor` as a constructor
+  kwarg).
+
 - Honeypot real-time monitoring wired into the GUI. The `Honeypot`
   tab now has a `Start monitoring` / `Stop monitoring` toggle and a
   live alerts panel below the status box. Alerts come from

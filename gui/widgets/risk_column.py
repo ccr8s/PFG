@@ -68,6 +68,11 @@ class RiskColumn(ctk.CTkFrame):
             command=lambda r=result: self._on_select(r),
         )
         btn.pack(fill="x", pady=1)
+        target = getattr(btn, "_canvas", btn)
+        try:
+            target.configure(cursor="hand2")
+        except Exception:
+            pass
 
         full_name = result.file_path.name
         ToolTip(btn, full_name)

@@ -12,13 +12,20 @@ import logging
 import threading
 from pathlib import Path
 from tkinter import filedialog, messagebox
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 import customtkinter as ctk
 
 from core.models import ScanResult, ScanSummary
 from gui.styles import COLORS, DIMENSIONS, FONTS
-from gui.widgets import DetailPanel, HoneypotTab, RiskColumn, ToolTab
+from gui.widgets import (
+    DetailPanel,
+    HoneypotAlertsTab,
+    HoneypotTab,
+    RiskColumn,
+    ToolTab,
+    use_hand_cursor,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -149,6 +156,8 @@ class FileGuardApp(ctk.CTk):
             text_color=COLORS["text_accent"],
         )
         self.lbl_title.pack(side="right", padx=12)
+
+        use_hand_cursor(self.btn_scan, self.btn_stop, self.btn_export)
 
     # ── Paned Layout ─────────────────────────────────────────
 
@@ -702,9 +711,56 @@ class FileGuardApp(ctk.CTk):
             self.tool_notebook.add(tab, text=label)
             self.tool_tabs[label] = tab
 
-        # Tab 7: Honeypot (interactive, not a ToolTab).
-        self.honeypot_tab = HoneypotTab(self.tool_notebook)
+        # Tab 7: Honeypot management (controls + tutorial).
+        self.honeypot_alerts_tab = HoneypotAlertsTab(self.tool_notebook)
+        self.honeypot_tab = HoneypotTab(
+            self.tool_notebook,
+            on_alert=self._on_honeypot_alert,
+            on_monitor_state=self._on_honeypot_monitor_state,
+        )
         self.tool_notebook.add(self.honeypot_tab, text="Honeypot")
+
+        # Tab 8: Honeypot alerts (passive feed + flashing tab title).
+        self.tool_notebook.add(
+            self.honeypot_alerts_tab, text="Honeypot Alerts"
+        )
+        self.honeypot_alerts_tab.attach_to_notebook(
+            self.tool_notebook,
+            self.tool_notebook.index(self.honeypot_alerts_tab),
+        )
+
+        self.tool_notebook.bind(
+            "<<NotebookTabChanged>>", self._on_tool_tab_changed, add="+"
+        )
+
+    # ── Honeypot alert routing ─────────────────────────────────
+
+    def _on_honeypot_alert(self, alert: Any) -> None:
+        """Main-thread router from HoneypotTab to HoneypotAlertsTab."""
+        try:
+            self.honeypot_alerts_tab.add_alert(alert)
+        except Exception:
+            logger.exception("Failed to render honeypot alert")
+
+    def _on_honeypot_monitor_state(
+        self, monitoring: bool, message: Optional[str]
+    ) -> None:
+        try:
+            self.honeypot_alerts_tab.set_monitoring_state(
+                monitoring=monitoring, message=message
+            )
+        except Exception:
+            logger.exception("Honeypot monitor-state notify failed")
+
+    def _on_tool_tab_changed(self, _event: Any) -> None:
+        """When the alerts tab becomes active, mark unread cleared."""
+        try:
+            current = self.tool_notebook.index(self.tool_notebook.select())
+            alerts_idx = self.tool_notebook.index(self.honeypot_alerts_tab)
+            if current == alerts_idx:
+                self.honeypot_alerts_tab.mark_viewed()
+        except Exception:
+            pass
 
     # ── Shutdown ───────────────────────────────────────────────
 

@@ -95,7 +95,7 @@ python main.py honeypot --remove     # clean up
 python main.py --gui
 ```
 
-The bottom panel hosts a tabbed view: an `Activity` log, one tab per forensic tool (Event Logs, Registry, Timestamps, Prefetch, Amcache, Bitmap Cache), and a `Honeypot` tab with a built-in tutorial plus Deploy / Remove / Choose-decoys / **Start monitoring** controls and a live alerts panel. Each forensic tab carries its own `Run` button, so output from one tool no longer overwrites another's.
+The bottom panel hosts a tabbed view: an `Activity` log, one tab per forensic tool (Event Logs, Registry, Timestamps, Prefetch, Amcache, Bitmap Cache), a `Honeypot` tab (tutorial + Deploy / Remove / Choose-decoys / **Start monitoring** controls), and a separate `Honeypot Alerts` tab. The alerts tab carries an unread counter in its title and pulses when new alerts arrive while you're on another tab; switching to it clears the indicator. Each forensic tab carries its own `Run` button, so output from one tool no longer overwrites another's. All clickable buttons show the pointer-finger cursor on hover.
 
 #### Honeypot monitoring caveat
 
