@@ -131,6 +131,41 @@ python main.py scan C:\some\real\path
 
 ---
 
+## Reviewing flagged files safely
+
+When the GUI flags a file, **don't** just open it. Even a "harmless" double-click can trigger Explorer preview handlers that parse the file with the same buggy code that made it suspicious in the first place. FileGuard ships two built-in alternatives:
+
+### Preview (safe) — always available
+
+The detail panel's **Preview (safe)** button opens a read-only window with three tabs:
+
+- **Hex** — first 4 KB rendered as a classic offset/hex/ASCII dump.
+- **Strings** — extracted printable runs (ASCII + UTF-16 LE), deduplicated.
+- **PE Headers** — only shown for PE files; lists machine, sections (with entropy), and imports, with notable Windows API calls highlighted.
+
+This view never invokes a Windows shell handler, never spawns a subprocess on the file, and never decodes the bytes into objects with side effects. The worst it can do is render garbled text.
+
+### Detonate in Sandbox — Pro / Enterprise / Education only
+
+The red **Detonate in Sandbox** button is for when you actually need to *run* the file to see what it does. It uses [Windows Sandbox](https://learn.microsoft.com/en-us/windows/security/threat-protection/windows-sandbox/windows-sandbox-overview), Microsoft's built-in disposable VM:
+
+1. Copies the file into `data/sandbox_staging/<uuid>/` (gitignored).
+2. Generates an `isolated.wsb` config that mounts the staging dir **read-only**, with networking, GPU, clipboard, printer, audio, and video redirection all **disabled**.
+3. Launches `WindowsSandbox.exe` with **only** the `.wsb` path on the command line — the suspicious file is never passed as a process argument.
+
+The sample lives on the host the whole time; the sandbox just gets a read-only view of the staging directory.
+
+**Automatic cleanup** — staged copies don't accumulate on disk:
+
+- While a detonation is active, the **Detonate in Sandbox** button changes to an amber **Close Sandbox** button. Clicking it force-terminates the sandbox VM and immediately deletes the staging dir.
+- Closing the sandbox window with X is detected by a background watcher (polls `WindowsSandboxClient.exe` every 5 s); the staging dir is deleted automatically when the VM exits.
+- Closing FileGuard itself with X (or Alt+F4) terminates any running sandbox and wipes every staging dir from this session before exiting.
+- On startup FileGuard sweeps any staging dir older than 24 h, so a previous crash doesn't leave litter behind.
+
+If the **Detonate** button is greyed out, Windows Sandbox isn't enabled. Turn it on via *Turn Windows features on or off → Windows Sandbox → reboot*. It requires Windows 10/11 Pro / Enterprise / Education with hardware virtualization enabled in BIOS/UEFI.
+
+---
+
 ## Project Layout
 
 ```

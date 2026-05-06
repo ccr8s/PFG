@@ -51,6 +51,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Minimal `.ruff.toml` with the `E`, `F`, `W`, `I` rule sets and per-file
   ignores for optional-dependency availability probes.
 - `CHANGELOG.md` (this file).
+- Safe in-process file preview. New **Preview (safe)** button on the
+  detail panel opens a modal with three tabs: a hex+ASCII dump of the
+  first 4 KB, extracted ASCII / UTF-16 LE strings, and (for PE files) a
+  parsed header summary including sections, entropy, and a list of
+  notable Windows API imports. Reads bytes through `utils.safety.safe_read`
+  - no `os.startfile`, no `webbrowser.open`, no subprocess on the file.
+  Implemented in `utils/safe_preview.py` and `gui/widgets/preview_window.py`.
+- Windows Sandbox detonation. New **Detonate in Sandbox** button stages
+  the flagged file into `data/sandbox_staging/<uuid>/`, generates an
+  `isolated.wsb` config (networking / GPU / clipboard / printer / audio /
+  video redirection all disabled, host folder mounted read-only), and
+  launches `WindowsSandbox.exe` with **only** the `.wsb` path on argv.
+  Greys out automatically when Windows Sandbox isn't installed.
+  Implemented in `utils/sandbox_launcher.py`. Requires Windows 10/11 Pro /
+  Enterprise / Education.
+- Windows edition fail-safe for sandbox detonation. New
+  `sandbox_unavailable_reason()` and `windows_edition()` helpers in
+  `utils/sandbox_launcher.py` use `platform.win32_edition()` to
+  reject Home / non-Pro SKUs explicitly with a beginner-friendly
+  message ("Windows Sandbox isn't available on Windows Home..."),
+  rather than the previous vague "WindowsSandbox.exe not found".
+  The check runs at app start (tooltip) **and** at click time
+  inside `detonate()` itself, so a stale GUI state can't slip past
+  it. Non-Windows platforms are also rejected up front.
+- Automatic sandbox cleanup. Per-detonation watcher thread polls for
+  `WindowsSandboxClient.exe` and deletes the staging dir as soon as the
+  sandbox VM exits. The Detonate button flips to an amber **Close Sandbox**
+  button while a sandbox is active; clicking it force-terminates the VM
+  via `taskkill` and cleans up immediately. Closing the FileGuard main
+  window (`WM_DELETE_WINDOW`) tears down all active sandboxes and wipes
+  every staging dir from the session. Stale staging dirs older than 24 h
+  are also swept on app start.
+- `data/sandbox_staging/` added to `.gitignore` so per-detonation copies
+  of suspicious files never end up in the repo.
 
 ### Changed
 - `gui/app.py` (33 KB) split into per-widget modules under `gui/widgets/`:

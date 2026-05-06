@@ -47,6 +47,8 @@ class FileGuardApp(ctk.CTk):
         self._scan_results: List[ScanResult] = []
         self._scan_running = False
         self._scan_cancelled = False
+        self._stopping = False
+        self._stop_anim_index = 0
         self._scan_thread: Optional[threading.Thread] = None
         self._cancel_event: Optional[threading.Event] = None
         self._selected_result: Optional[ScanResult] = None
@@ -55,6 +57,24 @@ class FileGuardApp(ctk.CTk):
         self._build_toolbar()
         self._build_paned_layout()
         self._update_status("Ready")
+
+        # Sweep stale sandbox staging dirs left over from prior runs
+        # (e.g. previous crash or hard kill) before the user gets
+        # confused by stuff hanging around in data/sandbox_staging/.
+        try:
+            from utils.sandbox_launcher import cleanup_staging
+            stale = cleanup_staging(older_than_hours=24)
+            if stale:
+                logger.info(
+                    "Cleaned %d stale sandbox staging dir(s) on startup",
+                    stale,
+                )
+        except Exception:
+            logger.exception("Startup sandbox staging sweep failed")
+
+        # Catch the X button so we can terminate any active sandbox
+        # and wipe its staging dir before exiting.
+        self.protocol("WM_DELETE_WINDOW", self._on_close_window)
 
     # ── Toolbar ────────────────────────────────────────────────
 
@@ -214,9 +234,15 @@ class FileGuardApp(ctk.CTk):
 
         self._scan_running = True
         self._scan_cancelled = False
+        self._stopping = False
         self._cancel_event = threading.Event()
         self.btn_scan.configure(state="disabled")
-        self.btn_stop.configure(state="normal")
+        self.btn_stop.configure(
+            state="normal",
+            text="\u25a0  Stop",
+            fg_color="#555555",
+            hover_color="#333333",
+        )
         self._clear_results()
         self._update_status(f"Scanning: {target}")
         self._info_write(f"\nStarting scan of {target}...\n")
@@ -235,15 +261,47 @@ class FileGuardApp(ctk.CTk):
         scanner stops accepting new work, cancels pending workers,
         and returns; the worker thread's ``finally`` block calls
         :meth:`_scan_complete` once it actually exits.
+
+        Also gives the user clear visual confirmation that the click
+        registered: the button immediately recolours to amber, the
+        status text latches to ``Stopping...`` (no longer overwritten
+        by progress callbacks), and the progress bar switches into
+        an indeterminate pulsing animation so it stops crawling
+        forward.
         """
-        if not self._scan_running:
+        if not self._scan_running or self._stopping:
             return
+        self._stopping = True
         self._scan_cancelled = True
         if self._cancel_event is not None:
             self._cancel_event.set()
-        self.btn_stop.configure(state="disabled", text="\u25a0  Stopping")
-        self._update_status("Stopping scan...")
-        self._info_write("\nStop requested - waiting for workers to finish...\n")
+
+        self.btn_stop.configure(
+            state="disabled",
+            text="\u25a0  Stopping...",
+            fg_color="#d68910",
+            text_color="#1a1a2e",
+        )
+        try:
+            self.btn_stop.update_idletasks()
+        except Exception:
+            pass
+
+        self._update_status(
+            "Stopping scan - waiting for in-flight workers..."
+        )
+        self._info_write(
+            "\nStop requested - waiting for workers to finish...\n"
+        )
+
+        try:
+            self.progress.configure(mode="indeterminate")
+            self.progress.start()
+        except Exception:
+            pass
+
+        self._stop_anim_index = 0
+        self._animate_stopping()
 
     def _run_scan(self, target: str) -> None:
         """Execute scan in background thread.
@@ -322,7 +380,17 @@ class FileGuardApp(ctk.CTk):
         total: int,
         current: Optional[Path],
     ) -> None:
-        """Update progress bar and status label on the main thread."""
+        """Update progress bar and status label on the main thread.
+
+        Once the user has clicked Stop we leave the latched
+        ``Stopping...`` status and indeterminate progress bar alone -
+        otherwise late progress callbacks from in-flight workers would
+        flash the per-file status back over our acknowledgement and
+        make the click look like it was ignored.
+        """
+        if self._stopping:
+            return
+
         if total <= 0:
             self.progress.set(0)
             self._update_status("Enumerating files...")
@@ -335,12 +403,46 @@ class FileGuardApp(ctk.CTk):
             name = name[:37] + "..."
         self._update_status(f"Scanning {processed}/{total}: {name}")
 
+    def _animate_stopping(self) -> None:
+        """Animate the status label while the scan winds down.
+
+        Cycles ``Stopping`` / ``Stopping.`` / ``Stopping..`` /
+        ``Stopping...`` so the user has continuous proof that the UI
+        is alive and the click was honoured. Self-cancels via
+        ``_stopping`` once the scan thread finishes.
+        """
+        if not self._stopping:
+            return
+        dots = "." * (self._stop_anim_index % 4)
+        self._update_status(
+            f"Stopping{dots} waiting for in-flight workers"
+        )
+        self._stop_anim_index += 1
+        self.after(350, self._animate_stopping)
+
     def _scan_complete(self) -> None:
         """Reset UI after scan completes (or is cancelled)."""
         self._scan_running = False
+        was_stopping = self._stopping
+        self._stopping = False
         self.btn_scan.configure(state="normal")
-        self.btn_stop.configure(state="disabled", text="\u25a0  Stop")
+        self.btn_stop.configure(
+            state="disabled",
+            text="\u25a0  Stop",
+            fg_color="#555555",
+            hover_color="#333333",
+            text_color="#ffffff",
+        )
+
+        if was_stopping:
+            try:
+                self.progress.stop()
+                self.progress.configure(mode="determinate")
+            except Exception:
+                pass
+
         if self._scan_cancelled:
+            self.progress.set(0)
             self._update_status(
                 f"Scan stopped - {len(self._scan_results)} files analyzed"
             )
@@ -495,6 +597,46 @@ class FileGuardApp(ctk.CTk):
         """Append text to the info panel."""
         self.info_text.insert("end", text)
         self.info_text.see("end")
+
+    # ── Shutdown ───────────────────────────────────────────────
+
+    def _on_close_window(self) -> None:
+        """Window-close handler: tear down sandboxes and exit cleanly.
+
+        Bound to ``WM_DELETE_WINDOW`` so the X button (or Alt+F4)
+        force-terminates any sandbox VM still running, deletes every
+        staging dir from this session, and signals any in-flight scan
+        to stop. We never block the user from closing.
+        """
+        try:
+            self._scan_cancelled = True
+            self._stopping = True
+            if self._cancel_event is not None:
+                self._cancel_event.set()
+        except Exception:
+            pass
+
+        try:
+            from utils.sandbox_launcher import (
+                active_detonations,
+                terminate_all,
+            )
+            if active_detonations():
+                cleaned = terminate_all()
+                logger.info(
+                    "App close: terminated sandboxes and cleaned %d "
+                    "staging dir(s)",
+                    cleaned,
+                )
+            else:
+                terminate_all()
+        except Exception:
+            logger.exception("Sandbox cleanup on app close failed")
+
+        try:
+            self.destroy()
+        except Exception:
+            pass
 
 
 # ── Entry Point ────────────────────────────────────────────────

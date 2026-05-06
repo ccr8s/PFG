@@ -76,6 +76,10 @@ fileguard.log
 FileGuardTest/
 mock_system/
 
+# Per-detonation staging dirs created by utils/sandbox_launcher.py.
+# Never commit copies of flagged samples.
+data/sandbox_staging/
+
 # =============================================================================
 # IDEs / editors
 # =============================================================================
