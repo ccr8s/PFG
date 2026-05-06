@@ -6,6 +6,7 @@ scanning with multi-threaded analysis using all registered detectors.
 """
 
 import logging
+import threading
 import uuid
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
@@ -97,6 +98,7 @@ class FileScanner:
         deep: bool = False,
         quick: bool = False,
         progress_callback: Optional[ProgressCallback] = None,
+        cancel_event: Optional[threading.Event] = None,
     ) -> Generator[ScanResult, None, None]:
         """
         Scan a directory or file and yield results.
@@ -111,6 +113,10 @@ class FileScanner:
                 being enumerated; ``current_path`` may be ``None`` while
                 walking. The callback runs on the worker-completion
                 thread; UI callers must marshal to their main thread.
+            cancel_event: Optional threading.Event. If set, the scan
+                stops accepting new work, cancels still-pending workers,
+                and returns. Already-running workers finish in the
+                background but their results are dropped.
 
         Yields:
             ScanResult for each analyzed file.
@@ -126,6 +132,9 @@ class FileScanner:
         self._files_skipped = 0
         self._files_error = 0
 
+        def _cancelled() -> bool:
+            return cancel_event is not None and cancel_event.is_set()
+
         def _emit(processed: int, total: int, current: Optional[Path]) -> None:
             if progress_callback is None:
                 return
@@ -136,6 +145,8 @@ class FileScanner:
 
         if target.is_file():
             _emit(0, 1, target)
+            if _cancelled():
+                return
             result = self._analyze_file(target)
             if result:
                 self._files_scanned += 1
@@ -160,30 +171,50 @@ class FileScanner:
         if isinstance(default_exclusions, list):
             all_exclusions.extend(default_exclusions)
 
-        # Signal "enumerating" before we know the total
+        # Signal "enumerating" before we know the total. Walk lazily so
+        # cancel during a giant tree is responsive instead of waiting
+        # for rglob to finish materializing.
         _emit(0, 0, None)
 
-        files = list(walk_directory(
+        files: List[Path] = []
+        for f in walk_directory(
             root=target,
             recursive=True,
             follow_symlinks=False,
             exclusions=all_exclusions,
             max_file_size_mb=self.max_file_size_mb,
             scan_hidden=scanner_config.get("scan_hidden", True),
-        ))
+        ):
+            if _cancelled():
+                logger.info("Scan cancelled during enumeration")
+                return
+            files.append(f)
 
         total = len(files)
         logger.info("Found %d files to scan", total)
         _emit(0, total, None)
 
+        if _cancelled():
+            logger.info("Scan cancelled before analysis")
+            return
+
+        # Manual executor lifecycle so we can shutdown(cancel_futures=True)
+        # without waiting for in-flight workers to finish.
+        executor = ThreadPoolExecutor(max_workers=self.threads)
         processed = 0
-        with ThreadPoolExecutor(max_workers=self.threads) as executor:
+        try:
             futures = {
                 executor.submit(self._analyze_file, f): f
                 for f in files
             }
 
             for future in as_completed(futures):
+                if _cancelled():
+                    logger.info(
+                        "Scan cancelled at %d/%d", processed, total
+                    )
+                    break
+
                 file_path = futures[future]
                 processed += 1
                 try:
@@ -199,12 +230,20 @@ class FileScanner:
                     self._files_error += 1
                     logger.error("Scan failed for %s: %s", file_path, e)
                     _emit(processed, total, file_path)
+        finally:
+            # cancel_futures requires Python 3.9+. Don't wait - the
+            # caller wants to return control immediately. In-flight
+            # workers (up to self.threads) finish in the background;
+            # their results are dropped because we've broken out of
+            # the as_completed loop.
+            executor.shutdown(wait=False, cancel_futures=True)
 
         logger.info(
-            "Scan complete: %d scanned, %d skipped, %d errors",
+            "Scan complete: %d scanned, %d skipped, %d errors%s",
             self._files_scanned,
             self._files_skipped,
             self._files_error,
+            " (cancelled)" if _cancelled() else "",
         )
 
     def scan_full(

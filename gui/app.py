@@ -46,7 +46,9 @@ class FileGuardApp(ctk.CTk):
         # State
         self._scan_results: List[ScanResult] = []
         self._scan_running = False
+        self._scan_cancelled = False
         self._scan_thread: Optional[threading.Thread] = None
+        self._cancel_event: Optional[threading.Event] = None
         self._selected_result: Optional[ScanResult] = None
 
         # Build UI
@@ -211,6 +213,8 @@ class FileGuardApp(ctk.CTk):
             return
 
         self._scan_running = True
+        self._scan_cancelled = False
+        self._cancel_event = threading.Event()
         self.btn_scan.configure(state="disabled")
         self.btn_stop.configure(state="normal")
         self._clear_results()
@@ -225,11 +229,21 @@ class FileGuardApp(ctk.CTk):
         self._scan_thread.start()
 
     def _on_stop_scan(self) -> None:
-        """Handle Stop button."""
-        self._scan_running = False
-        self._update_status("Scan stopped")
-        self.btn_scan.configure(state="normal")
-        self.btn_stop.configure(state="disabled")
+        """Handle Stop button.
+
+        Signals the background scanner via the cancel event. The
+        scanner stops accepting new work, cancels pending workers,
+        and returns; the worker thread's ``finally`` block calls
+        :meth:`_scan_complete` once it actually exits.
+        """
+        if not self._scan_running:
+            return
+        self._scan_cancelled = True
+        if self._cancel_event is not None:
+            self._cancel_event.set()
+        self.btn_stop.configure(state="disabled", text="\u25a0  Stopping")
+        self._update_status("Stopping scan...")
+        self._info_write("\nStop requested - waiting for workers to finish...\n")
 
     def _run_scan(self, target: str) -> None:
         """Execute scan in background thread.
@@ -262,7 +276,9 @@ class FileGuardApp(ctk.CTk):
             self.after(0, self.progress.set, 0)
 
             for result in scanner.scan(
-                Path(target), progress_callback=on_progress
+                Path(target),
+                progress_callback=on_progress,
+                cancel_event=self._cancel_event,
             ):
                 results.append(result)
 
@@ -316,14 +332,23 @@ class FileGuardApp(ctk.CTk):
         self._update_status(f"Scanning {processed}/{total}: {name}")
 
     def _scan_complete(self) -> None:
-        """Reset UI after scan completes."""
+        """Reset UI after scan completes (or is cancelled)."""
         self._scan_running = False
         self.btn_scan.configure(state="normal")
-        self.btn_stop.configure(state="disabled")
-        self.progress.set(1.0)
-        self._update_status(
-            f"Scan complete - {len(self._scan_results)} files analyzed"
-        )
+        self.btn_stop.configure(state="disabled", text="\u25a0  Stop")
+        if self._scan_cancelled:
+            self._update_status(
+                f"Scan stopped - {len(self._scan_results)} files analyzed"
+            )
+            self._info_write(
+                f"Scan stopped after {len(self._scan_results)} files.\n"
+            )
+        else:
+            self.progress.set(1.0)
+            self._update_status(
+                f"Scan complete - {len(self._scan_results)} files analyzed"
+            )
+        self._cancel_event = None
 
     def _display_results(self, summary: ScanSummary) -> None:
         """Populate the risk columns from scan results."""

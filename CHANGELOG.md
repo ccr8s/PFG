@@ -22,6 +22,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `default=str`.
 
 ### Added
+- GUI Stop button now actually halts a running scan. Implemented via
+  a `threading.Event` plumbed through `FileScanner.scan(cancel_event=)`.
+  When set, the scanner stops accepting new work, calls
+  `executor.shutdown(wait=False, cancel_futures=True)` to drop pending
+  futures, and returns. In-flight workers (up to `threads`) finish in
+  the background, so CPU subsides within a few seconds instead of
+  running to completion. Also responsive during the directory walk
+  on huge trees.
 - Real-time scan progress in both CLI and GUI. `FileScanner.scan` now
   accepts a `progress_callback(processed, total, current_path)`. The
   CLI shows `Scanning <name>  N/M  XX% <elapsed>`; the GUI shows
