@@ -1,0 +1,61 @@
+title: Security Event Log Cleared
+id: d99b79d6-0b47-4f9d-8cc4-8bf09e76b1fa
+status: stable
+level: critical
+description: Detects when the Windows Security Event Log is cleared, potential evidence destruction
+author: FileGuard
+date: 2024/01/15
+tags:
+    - attack.defense_evasion
+    - attack.t1070.001
+logsource:
+    product: windows
+    service: security
+detection:
+    selection:
+        EventID: 1102
+    condition: selection
+falsepositives:
+    - Legitimate administrative activity
+    - Log rotation policies
+---
+title: System Event Log Cleared
+id: 6e5a38a6-8dde-4edb-8e24-32fe6b53d03b
+status: stable
+level: high
+description: Detects when the Windows System Event Log is cleared
+author: FileGuard
+date: 2024/01/15
+tags:
+    - attack.defense_evasion
+    - attack.t1070.001
+logsource:
+    product: windows
+    service: system
+detection:
+    selection:
+        EventID: 104
+    condition: selection
+falsepositives:
+    - Legitimate administrative activity
+---
+title: Event Log Service Stopped
+id: 7fb14104-e7eb-4dbb-a7cd-5a0b2e4a8a2f
+status: stable
+level: high
+description: Detects when Windows Event Log service is stopped
+author: FileGuard
+date: 2024/01/15
+tags:
+    - attack.defense_evasion
+    - attack.t1070.001
+logsource:
+    product: windows
+    service: security
+detection:
+    selection:
+        EventID: 1100
+    condition: selection
+falsepositives:
+    - System shutdown
+    - Legitimate maintenance

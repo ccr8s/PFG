@@ -1,0 +1,238 @@
+{
+  "version": "14.0",
+  "last_updated": "2024-01-15",
+  "techniques": [
+    {
+      "id": "T1059",
+      "name": "Command and Scripting Interpreter",
+      "tactic": "TA0002",
+      "description": "Adversaries may abuse command and script interpreters to execute commands, scripts, or binaries."
+    },
+    {
+      "id": "T1059.001",
+      "name": "PowerShell",
+      "tactic": "TA0002",
+      "description": "Adversaries may abuse PowerShell commands and scripts for execution.",
+      "subtechnique_of": "T1059"
+    },
+    {
+      "id": "T1059.003",
+      "name": "Windows Command Shell",
+      "tactic": "TA0002",
+      "description": "Adversaries may abuse the Windows command shell for execution.",
+      "subtechnique_of": "T1059"
+    },
+    {
+      "id": "T1105",
+      "name": "Ingress Tool Transfer",
+      "tactic": "TA0011",
+      "description": "Adversaries may transfer tools or other files from an external system into a compromised environment."
+    },
+    {
+      "id": "T1140",
+      "name": "Deobfuscate/Decode Files or Information",
+      "tactic": "TA0005",
+      "description": "Adversaries may use obfuscated files or information to hide artifacts of an intrusion."
+    },
+    {
+      "id": "T1027",
+      "name": "Obfuscated Files or Information",
+      "tactic": "TA0005",
+      "description": "Adversaries may attempt to make an executable or file difficult to discover or analyze."
+    },
+    {
+      "id": "T1003",
+      "name": "OS Credential Dumping",
+      "tactic": "TA0006",
+      "description": "Adversaries may attempt to dump credentials to obtain account login information."
+    },
+    {
+      "id": "T1003.001",
+      "name": "LSASS Memory",
+      "tactic": "TA0006",
+      "description": "Adversaries may attempt to access credential material stored in LSASS process memory.",
+      "subtechnique_of": "T1003"
+    },
+    {
+      "id": "T1055",
+      "name": "Process Injection",
+      "tactic": "TA0005",
+      "description": "Adversaries may inject code into processes to evade defenses and elevate privileges."
+    },
+    {
+      "id": "T1197",
+      "name": "BITS Jobs",
+      "tactic": "TA0005",
+      "description": "Adversaries may abuse BITS jobs to download, execute, and clean up after malicious code."
+    },
+    {
+      "id": "T1218",
+      "name": "System Binary Proxy Execution",
+      "tactic": "TA0005",
+      "description": "Adversaries may bypass process and/or signature-based defenses by proxying execution."
+    },
+    {
+      "id": "T1218.005",
+      "name": "Mshta",
+      "tactic": "TA0005",
+      "description": "Adversaries may abuse mshta.exe to proxy execution of malicious code.",
+      "subtechnique_of": "T1218"
+    },
+    {
+      "id": "T1218.010",
+      "name": "Regsvr32",
+      "tactic": "TA0005",
+      "description": "Adversaries may abuse Regsvr32.exe to proxy execution of malicious code.",
+      "subtechnique_of": "T1218"
+    },
+    {
+      "id": "T1218.011",
+      "name": "Rundll32",
+      "tactic": "TA0005",
+      "description": "Adversaries may abuse rundll32.exe to proxy execution of malicious code.",
+      "subtechnique_of": "T1218"
+    },
+    {
+      "id": "T1047",
+      "name": "Windows Management Instrumentation",
+      "tactic": "TA0002",
+      "description": "Adversaries may abuse WMI to execute malicious commands and payloads."
+    },
+    {
+      "id": "T1053",
+      "name": "Scheduled Task/Job",
+      "tactic": "TA0003",
+      "description": "Adversaries may abuse task scheduling functionality to facilitate execution."
+    },
+    {
+      "id": "T1053.005",
+      "name": "Scheduled Task",
+      "tactic": "TA0003",
+      "description": "Adversaries may abuse Windows Task Scheduler to perform task scheduling for execution.",
+      "subtechnique_of": "T1053"
+    },
+    {
+      "id": "T1490",
+      "name": "Inhibit System Recovery",
+      "tactic": "TA0040",
+      "description": "Adversaries may delete or remove built-in OS data designed to aid in recovery."
+    },
+    {
+      "id": "T1555",
+      "name": "Credentials from Password Stores",
+      "tactic": "TA0006",
+      "description": "Adversaries may search for common password storage locations."
+    },
+    {
+      "id": "T1087",
+      "name": "Account Discovery",
+      "tactic": "TA0007",
+      "description": "Adversaries may attempt to get a listing of accounts on a system or domain."
+    },
+    {
+      "id": "T1087.002",
+      "name": "Domain Account",
+      "tactic": "TA0007",
+      "description": "Adversaries may attempt to get a listing of domain accounts.",
+      "subtechnique_of": "T1087"
+    },
+    {
+      "id": "T1558",
+      "name": "Steal or Forge Kerberos Tickets",
+      "tactic": "TA0006",
+      "description": "Adversaries may attempt to subvert Kerberos authentication."
+    },
+    {
+      "id": "T1569",
+      "name": "System Services",
+      "tactic": "TA0002",
+      "description": "Adversaries may abuse system services to execute commands or programs."
+    },
+    {
+      "id": "T1569.002",
+      "name": "Service Execution",
+      "tactic": "TA0002",
+      "description": "Adversaries may abuse Windows service control manager to execute malicious commands.",
+      "subtechnique_of": "T1569"
+    },
+    {
+      "id": "T1021",
+      "name": "Remote Services",
+      "tactic": "TA0008",
+      "description": "Adversaries may use remote services to access and persist within a network."
+    },
+    {
+      "id": "T1021.002",
+      "name": "SMB/Windows Admin Shares",
+      "tactic": "TA0008",
+      "description": "Adversaries may use SMB to interact with network shares for lateral movement.",
+      "subtechnique_of": "T1021"
+    },
+    {
+      "id": "T1547",
+      "name": "Boot or Logon Autostart Execution",
+      "tactic": "TA0003",
+      "description": "Adversaries may configure system settings to automatically execute a program during boot or logon."
+    },
+    {
+      "id": "T1547.001",
+      "name": "Registry Run Keys / Startup Folder",
+      "tactic": "TA0003",
+      "description": "Adversaries may achieve persistence by adding a program to startup folder or registry run key.",
+      "subtechnique_of": "T1547"
+    },
+    {
+      "id": "T1547.004",
+      "name": "Winlogon Helper DLL",
+      "tactic": "TA0003",
+      "description": "Adversaries may abuse Winlogon features to execute DLLs during logon.",
+      "subtechnique_of": "T1547"
+    },
+    {
+      "id": "T1070",
+      "name": "Indicator Removal",
+      "tactic": "TA0005",
+      "description": "Adversaries may delete or modify artifacts generated within systems to remove evidence."
+    },
+    {
+      "id": "T1070.001",
+      "name": "Clear Windows Event Logs",
+      "tactic": "TA0005",
+      "description": "Adversaries may clear Windows Event Logs to hide activity.",
+      "subtechnique_of": "T1070"
+    },
+    {
+      "id": "T1070.006",
+      "name": "Timestomp",
+      "tactic": "TA0005",
+      "description": "Adversaries may modify file timestamps to hide malware or tools.",
+      "subtechnique_of": "T1070"
+    },
+    {
+      "id": "T1564",
+      "name": "Hide Artifacts",
+      "tactic": "TA0005",
+      "description": "Adversaries may attempt to hide artifacts associated with their behaviors."
+    },
+    {
+      "id": "T1564.001",
+      "name": "Hidden Files and Directories",
+      "tactic": "TA0005",
+      "description": "Adversaries may hide files by setting the hidden attribute.",
+      "subtechnique_of": "T1564"
+    },
+    {
+      "id": "T1564.004",
+      "name": "NTFS File Attributes",
+      "tactic": "TA0005",
+      "description": "Adversaries may use NTFS file attributes to hide malicious data.",
+      "subtechnique_of": "T1564"
+    },
+    {
+      "id": "T1486",
+      "name": "Data Encrypted for Impact",
+      "tactic": "TA0040",
+      "description": "Adversaries may encrypt data on target systems to interrupt availability."
+    }
+  ]
+}

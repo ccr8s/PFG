@@ -1,0 +1,114 @@
+# FileGuard Configuration
+# Edit values below to customize behavior.
+#
+# IMPORTANT: This file is tracked in git. Do NOT put secrets, API keys,
+# passwords, or TAXII credentials here. Use config/secrets.yaml (it is
+# gitignored) or environment variables instead. The CLI command
+# `python main.py config --set-virustotal-key <KEY>` writes to the
+# secrets file automatically.
+
+# Application settings
+app:
+  name: "FileGuard"
+  version: "1.0.0"
+  log_level: "INFO"  # DEBUG, INFO, WARNING, ERROR
+  log_file: "fileguard.log"
+
+# Scanning settings
+scanner:
+  threads: 4
+  max_file_size_mb: 100
+  follow_symlinks: false
+  scan_hidden: true
+  recursive: true
+  default_exclusions:
+    - "*.tmp"
+    - "*.log"
+    - "Thumbs.db"
+    - "desktop.ini"
+  high_risk_locations:
+    - "\\AppData\\Local\\Temp"
+    - "\\Windows\\Temp"
+    - "\\Downloads"
+    - "\\Startup"
+    - "\\Start Menu\\Programs\\Startup"
+
+# Risk classification thresholds
+risk:
+  critical_threshold: 80      # SUSPICIOUS_CODE: score >= 80
+  high_threshold: 60           # HIGH_TARGET: score 60-79
+  medium_threshold: 30         # POTENTIAL_RISK: score 30-59
+  # LOW_RISK: score < 30
+
+# Database settings
+database:
+  path: "data/fileguard.db"
+  max_results: 10000
+
+# YARA settings
+yara:
+  rules_directory: "rules/yara"
+  timeout: 60  # seconds per file
+  enabled: true
+
+# Sigma settings
+sigma:
+  rules_directory: "rules/sigma"
+  enabled: true
+
+# Hash checking
+hashes:
+  check_md5: true
+  check_sha256: true
+  known_hashes_db: "data/known_hashes.db"
+  virustotal_enabled: false
+  # VirusTotal API key lives in config/secrets.yaml (gitignored).
+  # Use: python main.py config --set-virustotal-key <KEY>
+
+# Entropy analysis
+entropy:
+  enabled: true
+  high_threshold: 7.5
+  suspicious_threshold: 7.0
+
+# Honeypot settings
+honeypot:
+  enabled: false
+  monitor_interval: 1  # seconds
+  decoy_locations:
+    - "Desktop"
+    - "Documents"
+    - "Downloads"
+  decoy_files:
+    - "passwords.xlsx"
+    - "bitcoin_wallet.dat"
+    - "bank_accounts.docx"
+    - "SSN_backup.txt"
+    - "tax_returns_2024.pdf"
+    - "credit_cards.csv"
+    - "master_password.txt"
+    - "crypto_seed_phrase.txt"
+
+# Export settings
+export:
+  stix_version: "2.1"
+  default_format: "json"
+
+# TAXII publishing
+taxii:
+  enabled: false
+  servers: []
+
+# Safety settings (DO NOT CHANGE IN PRODUCTION)
+safety:
+  sandbox_root: "C:\\FileGuardTest\\mock_system"
+  testing_mode: true
+  read_only: true
+
+# GUI settings
+gui:
+  theme: "dark"
+  font_family: "Consolas"
+  font_size: 11
+  window_width: 1400
+  window_height: 900

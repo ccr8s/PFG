@@ -1,0 +1,96 @@
+# =============================================================================
+# Python
+# =============================================================================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg
+*.egg-info/
+.eggs/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.tox/
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+*.cover
+.hypothesis/
+
+# =============================================================================
+# Virtual environments
+# =============================================================================
+venv/
+.venv/
+env/
+.env/
+ENV/
+
+# =============================================================================
+# Build artifacts
+# =============================================================================
+build/dist/
+dist/
+*.exe
+*.msi
+*.spec.bak
+*.manifest
+PyInstaller/
+
+# =============================================================================
+# Secrets and local config
+# =============================================================================
+# Never commit user-set API keys or credentials.
+.env
+.env.*
+!.env.example
+config/secrets.yaml
+config/local.yaml
+secrets/
+*.pem
+*.key
+*.pfx
+
+# =============================================================================
+# FileGuard runtime data
+# =============================================================================
+# Scan databases may contain real file paths and hashes from a host.
+data/*.db
+data/*.sqlite*
+data/known_hashes.db
+data/.fileguard_decoys.json
+
+# Honeypot manifest written at runtime
+.fileguard_decoys.json
+
+# Generated reports
+*.report.html
+*.report.json
+*.report.csv
+fileguard.log
+*.log
+
+# Sandbox (created by safety wrapper)
+FileGuardTest/
+mock_system/
+
+# =============================================================================
+# IDEs / editors
+# =============================================================================
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# =============================================================================
+# Misc
+# =============================================================================
+gui/testreports/
+*.tmp
+*.bak

@@ -1,0 +1,97 @@
+title: Suspicious PowerShell Download Commands
+id: 3b6ab547-8ec2-4991-b9d2-2b06702a48d7
+status: stable
+level: high
+description: Detects PowerShell commands commonly used to download and execute malicious payloads
+author: FileGuard
+date: 2024/01/15
+references:
+    - https://attack.mitre.org/techniques/T1059/001/
+    - https://attack.mitre.org/techniques/T1105/
+tags:
+    - attack.execution
+    - attack.t1059.001
+    - attack.command_and_control
+    - attack.t1105
+logsource:
+    product: windows
+    service: powershell
+    category: ps_script
+detection:
+    selection_download:
+        ScriptBlockText|contains:
+            - 'Invoke-WebRequest'
+            - 'wget '
+            - 'curl '
+            - 'DownloadFile'
+            - 'DownloadString'
+            - 'DownloadData'
+            - 'Net.WebClient'
+            - 'Start-BitsTransfer'
+    selection_execute:
+        ScriptBlockText|contains:
+            - 'Invoke-Expression'
+            - 'IEX('
+            - 'IEX ('
+            - '| IEX'
+            - 'Invoke-Command'
+            - 'ICM '
+    condition: selection_download and selection_execute
+falsepositives:
+    - Legitimate PowerShell scripts that download and execute modules
+    - Software deployment scripts
+---
+title: PowerShell Encoded Command Execution
+id: fb843269-508c-4b76-8b8d-88679db22ce7
+status: stable
+level: high
+description: Detects execution of PowerShell with encoded commands, commonly used to obfuscate malicious scripts
+author: FileGuard
+date: 2024/01/15
+tags:
+    - attack.defense_evasion
+    - attack.t1027
+    - attack.execution
+    - attack.t1059.001
+logsource:
+    product: windows
+    category: process_creation
+detection:
+    selection:
+        CommandLine|contains:
+            - ' -enc '
+            - ' -EncodedCommand '
+            - ' -ec '
+        Image|endswith: '\powershell.exe'
+    filter:
+        CommandLine|contains:
+            - 'Get-AppxPackage'
+    condition: selection and not filter
+falsepositives:
+    - Some legitimate software deployment tools use encoded commands
+---
+title: Mimikatz Command Line Keywords
+id: a642964e-bead-4bed-8910-1bb4d63e3b77
+status: stable
+level: critical
+description: Detects Mimikatz command line arguments
+author: FileGuard
+date: 2024/01/15
+tags:
+    - attack.credential_access
+    - attack.t1003.001
+logsource:
+    product: windows
+    category: process_creation
+detection:
+    selection:
+        CommandLine|contains:
+            - 'sekurlsa::'
+            - 'kerberos::'
+            - 'crypto::'
+            - 'lsadump::'
+            - 'privilege::debug'
+            - 'token::elevate'
+    condition: selection
+falsepositives:
+    - Legitimate security testing

@@ -1,0 +1,81 @@
+# FileGuard - Cursor AI Rules
+
+## ⚠️ CRITICAL SAFETY RULES (ALWAYS ENFORCE)
+
+**NEVER:**
+- Write code that deletes, modifies, or moves files outside the project directory
+- Write code that modifies the Windows registry
+- Write code that creates/modifies Windows services or scheduled tasks
+- Run scans on actual system directories (C:\Windows, C:\Users, etc.)
+- Execute any remediation actions automatically
+- Use `os.remove()`, `shutil.rmtree()`, or `Path.unlink()` on system paths
+- Request or use admin privileges during development
+
+**ALWAYS:**
+- Use `utils/safety.py` wrapper for ALL file operations
+- Write unit tests using temporary directories or mocks
+- Use sandbox directory: `C:\FileGuardTest\mock_system`
+- Make scanning operations READ-ONLY by default
+- Require explicit user confirmation for any destructive action
+
+---
+
+## Code Standards
+
+- **Python**: 3.11+
+- **Style**: PEP 8 strict compliance
+- **Type Hints**: Required on ALL function signatures
+- **Docstrings**: Google style, all classes and public methods
+- **Line Length**: 100 characters max
+- **Imports**: stdlib → third-party → local (alphabetized)
+- **Paths**: Always use `pathlib.Path`, never `os.path`
+- **Logging**: Use `logging` module, never `print()` in production
+- **Errors**: Specific exceptions with try/except, always log errors
+
+---
+
+## Naming Conventions
+
+- **Constants**: `UPPER_SNAKE_CASE`
+- **Classes**: `PascalCase`
+- **Functions/Variables**: `snake_case`
+- **Private Methods**: `_single_underscore_prefix`
+
+---
+
+## Project Structure
+
+```
+fileguard/
+├── main.py              # Entry point
+├── cli.py               # CLI interface
+├── core/                # Core scanning engine
+├── detectors/           # Detection modules (YARA, Sigma, etc.)
+├── forensics/           # System artifact analysis
+├── honeypot/            # Decoy file management
+├── gui/                 # CustomTkinter GUI
+├── utils/               # Utilities (safety.py, exports)
+├── rules/               # YARA and Sigma rules
+├── data/                # Databases and data files
+├── config/              # Configuration files
+└── tests/               # Unit tests
+```
+
+---
+
+## Key Requirements
+
+1. **ATT&CK Mapping**: All detections must include `attack_techniques` and `attack_tactics`
+2. **Findings Format**: Use `core/models.py` dataclasses
+3. **Threading**: Use for any operation >100ms, never block GUI
+4. **Safety Wrapper**: All file I/O through `utils/safety.py`
+
+---
+
+## For Detailed Instructions
+
+See `docs/ai/` folder:
+- `MASTER_PROMPT.md` - Full coding standards and patterns
+- `PHASE_PLAN.md` - Development phases and tasks
+- `DETECTION_PATTERNS.md` - Signature database
+- Task-specific implementation guides

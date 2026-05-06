@@ -1,0 +1,39 @@
+# TAXII Server Configuration
+# Add your TAXII servers here for threat intelligence sharing
+
+servers:
+  # Example: Anomali STAXX (free)
+  # anomali_staxx:
+  #   enabled: false
+  #   server_url: "https://staxx.anomali.com/taxii/"
+  #   collection_id: "your-collection-id"
+  #   username: "your-username"
+  #   password: "your-password"
+  #   verify_ssl: true
+
+  # Example: MISP TAXII
+  # misp_taxii:
+  #   enabled: false
+  #   server_url: "https://your-misp.local/taxii/"
+  #   collection_id: "your-collection-id"
+  #   api_key: "your-api-key"
+
+  # Example: Custom TAXII Server
+  # custom_server:
+  #   enabled: true
+  #   server_url: "https://your-server.com/taxii2/"
+  #   collection_id: "collection-uuid"
+  #   username: "user"
+  #   password: "pass"
+
+# Auto-publish settings
+auto_publish:
+  enabled: false
+  min_risk_level: "SUSPICIOUS_CODE"
+  include_attack_mappings: true
+
+# Auto-fetch settings (import threat intel)
+auto_fetch:
+  enabled: false
+  interval_hours: 24
+  import_indicators: true

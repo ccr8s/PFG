@@ -1,0 +1,10 @@
+# Build dependencies
+pyinstaller>=6.0.0
+pywin32>=306
+pillow>=10.0.0
+
+# Optional: For creating installers
+# nsis (install separately)
+
+# Optional: Code signing
+# signtool (Windows SDK)
