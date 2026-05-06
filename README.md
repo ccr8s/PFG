@@ -4,6 +4,7 @@
 
 [![Python](https://img.shields.io/badge/python-3.11%2B-blue)](https://www.python.org/)
 [![Platform](https://img.shields.io/badge/platform-Windows%2010%2F11-lightgrey)](#)
+[![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![Status](https://img.shields.io/badge/status-pre--release-orange)](#)
 
 FileGuard scans for suspicious files, hunts for indicators of compromise in Windows artifacts, and deploys honeypot decoys that alert on touch. Detections are mapped to **MITRE ATT&CK** and exportable as **STIX 2.1** for sharing through TAXII.
@@ -220,6 +221,14 @@ python -m pytest tests/ --cov=. --cov-report=html
 
 ---
 
+## Attribution
+
+This project includes a subset of the MITRE ATT&CK framework in `data/mitre_attack.json`.
+
+> ATT&CK&reg; is &copy; The MITRE Corporation. Used under the [ATT&CK Terms of Use](https://attack.mitre.org/resources/legal-and-branding/terms-of-use/).
+
+---
+
 ## License
 
-For educational and authorized security testing only.
+[MIT](LICENSE) &mdash; do whatever you want with it. No warranty, no liability. Use at your own risk; you are responsible for ensuring you have authorization to scan whatever systems you point this at.
