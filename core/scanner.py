@@ -10,7 +10,9 @@ import uuid
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, Generator, List, Optional
+from typing import Any, Callable, Dict, Generator, List, Optional
+
+ProgressCallback = Callable[[int, int, Optional[Path]], None]
 
 from core.analyzer import FileAnalyzer
 from core.base import ConfigManager
@@ -94,6 +96,7 @@ class FileScanner:
         target: Path,
         deep: bool = False,
         quick: bool = False,
+        progress_callback: Optional[ProgressCallback] = None,
     ) -> Generator[ScanResult, None, None]:
         """
         Scan a directory or file and yield results.
@@ -102,6 +105,12 @@ class FileScanner:
             target: Path to scan (file or directory).
             deep: If True, scan system files (requires appropriate access).
             quick: If True, only scan high-risk locations.
+            progress_callback: Optional callable invoked as
+                ``(processed, total, current_path)`` whenever the scanner
+                advances. ``total == 0`` means the file list is still
+                being enumerated; ``current_path`` may be ``None`` while
+                walking. The callback runs on the worker-completion
+                thread; UI callers must marshal to their main thread.
 
         Yields:
             ScanResult for each analyzed file.
@@ -117,11 +126,24 @@ class FileScanner:
         self._files_skipped = 0
         self._files_error = 0
 
+        def _emit(processed: int, total: int, current: Optional[Path]) -> None:
+            if progress_callback is None:
+                return
+            try:
+                progress_callback(processed, total, current)
+            except Exception as cb_err:
+                logger.debug("progress_callback raised: %s", cb_err)
+
         if target.is_file():
-            # Single file scan
+            _emit(0, 1, target)
             result = self._analyze_file(target)
             if result:
+                self._files_scanned += 1
+                _emit(1, 1, target)
                 yield result
+            else:
+                self._files_skipped += 1
+                _emit(1, 1, target)
             return
 
         # Load scanner config
@@ -138,7 +160,9 @@ class FileScanner:
         if isinstance(default_exclusions, list):
             all_exclusions.extend(default_exclusions)
 
-        # Walk directory and collect files
+        # Signal "enumerating" before we know the total
+        _emit(0, 0, None)
+
         files = list(walk_directory(
             root=target,
             recursive=True,
@@ -148,9 +172,11 @@ class FileScanner:
             scan_hidden=scanner_config.get("scan_hidden", True),
         ))
 
-        logger.info("Found %d files to scan", len(files))
+        total = len(files)
+        logger.info("Found %d files to scan", total)
+        _emit(0, total, None)
 
-        # Multi-threaded analysis
+        processed = 0
         with ThreadPoolExecutor(max_workers=self.threads) as executor:
             futures = {
                 executor.submit(self._analyze_file, f): f
@@ -159,16 +185,20 @@ class FileScanner:
 
             for future in as_completed(futures):
                 file_path = futures[future]
+                processed += 1
                 try:
                     result = future.result()
                     if result:
                         self._files_scanned += 1
+                        _emit(processed, total, result.file_path)
                         yield result
                     else:
                         self._files_skipped += 1
+                        _emit(processed, total, file_path)
                 except Exception as e:
                     self._files_error += 1
                     logger.error("Scan failed for %s: %s", file_path, e)
+                    _emit(processed, total, file_path)
 
         logger.info(
             "Scan complete: %d scanned, %d skipped, %d errors",

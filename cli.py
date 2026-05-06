@@ -343,21 +343,35 @@ def handle_scan(args: argparse.Namespace) -> int:
     scan_id = str(uuid.uuid4())[:8]
     start_time = datetime.now()
     results = []
+    from rich.progress import MofNCompleteColumn, TimeElapsedColumn
+
     with Progress(
         SpinnerColumn(),
         TextColumn("[progress.description]{task.description}"),
         BarColumn(),
+        MofNCompleteColumn(),
         TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
+        TimeElapsedColumn(),
         console=console,
     ) as progress:
-        task = progress.add_task("Scanning files...", total=None)
+        task = progress.add_task("Enumerating files...", total=None)
 
-        for result in scanner.scan(args.path, deep=args.deep):
-            results.append(result)
-            progress.update(
-                task,
-                description=f"Scanning: {result.file_path.name[:40]}",
+        def on_progress(processed, total, current):
+            if total > 0:
+                progress.update(task, total=total, completed=processed)
+            name = current.name if current else "..."
+            if len(name) > 40:
+                name = name[:37] + "..."
+            label = (
+                f"Scanning {name}" if total > 0
+                else "Enumerating files..."
             )
+            progress.update(task, description=label)
+
+        for result in scanner.scan(
+            args.path, deep=args.deep, progress_callback=on_progress
+        ):
+            results.append(result)
 
     summary = ScanSummary(
         scan_id=scan_id,

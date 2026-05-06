@@ -22,6 +22,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `default=str`.
 
 ### Added
+- Real-time scan progress in both CLI and GUI. `FileScanner.scan` now
+  accepts a `progress_callback(processed, total, current_path)`. The
+  CLI shows `Scanning <name>  N/M  XX% <elapsed>`; the GUI shows
+  `Scanning N/M: <name>` with the bar filling proportionally. While
+  the file list is still being walked, both surface
+  `Enumerating files...` so the user can tell scanning hasn't frozen.
 - Scan results persisted to the SQLite database (`data/fileguard.db`) by
   default. Pass `--no-save` to skip persistence. The pre-existing
   `core/database.py` schema is finally wired up to the CLI.

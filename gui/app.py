@@ -232,16 +232,58 @@ class FileGuardApp(ctk.CTk):
         self.btn_stop.configure(state="disabled")
 
     def _run_scan(self, target: str) -> None:
-        """Execute scan in background thread."""
+        """Execute scan in background thread.
+
+        Streams results via :meth:`FileScanner.scan` so the progress
+        bar and status label can update per file. The progress
+        callback runs on a worker thread; we marshal each tick onto
+        the Tk main thread with ``after``.
+        """
+        import uuid
+        from datetime import datetime
+
         try:
+            from core.models import ScanSummary
             from core.scanner import FileScanner
 
             scanner = FileScanner()
-            summary = scanner.scan_full(Path(target))
+            scan_id = str(uuid.uuid4())[:8]
+            start_time = datetime.now()
+            results: List[ScanResult] = []
+
+            def on_progress(
+                processed: int,
+                total: int,
+                current: Optional[Path],
+            ) -> None:
+                self.after(0, self._on_scan_progress, processed, total, current)
+
+            self.after(0, self._update_status, "Enumerating files...")
+            self.after(0, self.progress.set, 0)
+
+            for result in scanner.scan(
+                Path(target), progress_callback=on_progress
+            ):
+                results.append(result)
+
+            summary = ScanSummary(
+                scan_id=scan_id,
+                start_time=start_time,
+                end_time=datetime.now(),
+                target_path=Path(target),
+                total_files=(
+                    scanner.stats["scanned"]
+                    + scanner.stats["skipped"]
+                    + scanner.stats["errors"]
+                ),
+                files_scanned=scanner.stats["scanned"],
+                files_skipped=scanner.stats["skipped"],
+                files_error=scanner.stats["errors"],
+                results=results,
+            )
 
             self._scan_results = summary.results
 
-            # Update GUI on main thread
             self.after(0, self._display_results, summary)
 
         except Exception as e:
@@ -253,6 +295,25 @@ class FileGuardApp(ctk.CTk):
 
         finally:
             self.after(0, self._scan_complete)
+
+    def _on_scan_progress(
+        self,
+        processed: int,
+        total: int,
+        current: Optional[Path],
+    ) -> None:
+        """Update progress bar and status label on the main thread."""
+        if total <= 0:
+            self.progress.set(0)
+            self._update_status("Enumerating files...")
+            return
+
+        fraction = max(0.0, min(1.0, processed / total))
+        self.progress.set(fraction)
+        name = current.name if current else ""
+        if len(name) > 40:
+            name = name[:37] + "..."
+        self._update_status(f"Scanning {processed}/{total}: {name}")
 
     def _scan_complete(self) -> None:
         """Reset UI after scan completes."""
