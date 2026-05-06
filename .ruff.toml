@@ -1,0 +1,34 @@
+# Minimal ruff config. Start permissive; tighten over time.
+target-version = "py311"
+line-length = 100
+
+extend-exclude = [
+    "build",
+    "venv",
+    ".venv",
+    "__pycache__",
+    ".pytest_cache",
+    "data",
+]
+
+[lint]
+select = [
+    "E",   # pycodestyle errors
+    "F",   # pyflakes
+    "W",   # pycodestyle warnings
+    "I",   # isort
+]
+ignore = [
+    "E501",  # line-too-long (handled by formatter, not enforced)
+    "E402",  # module level import not at top (main.py needs sys.path edit first)
+    "E731",  # lambda assignments are common in tk callbacks
+]
+
+[lint.per-file-ignores]
+"tests/*" = ["F401", "F811"]  # fixtures shadow names
+"__init__.py" = ["F401"]      # re-exports
+# Availability probes: `import X` inside try/except is intentional;
+# ruff's suggestion of importlib.util.find_spec is a separate refactor.
+"forensics/event_logs.py" = ["F401"]
+"honeypot/monitor.py" = ["F401"]
+"utils/taxii_client.py" = ["F401"]

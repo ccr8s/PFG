@@ -14,7 +14,7 @@ from typing import Any, Dict, Generator, List, Optional
 
 from core.analyzer import FileAnalyzer
 from core.base import ConfigManager
-from core.models import RiskLevel, ScanResult, ScanSummary
+from core.models import ScanResult, ScanSummary
 from core.risk_classifier import RiskClassifier
 from detectors.ads_scanner import ADSScanner
 from detectors.entropy_detector import EntropyDetector

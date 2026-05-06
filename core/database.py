@@ -8,15 +8,12 @@ and honeypot alerts.
 import json
 import logging
 import sqlite3
-from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from core.models import (
-    Finding,
     ForensicFinding,
     HoneypotAlert,
-    RiskLevel,
     ScanResult,
     ScanSummary,
 )
@@ -274,7 +271,7 @@ class Database:
                     if result.modified_time else None
                 ),
                 result.scan_time.isoformat(),
-                json.dumps(result.metadata),
+                json.dumps(result.metadata, default=str),
             ),
         )
         result_id = cursor.lastrowid

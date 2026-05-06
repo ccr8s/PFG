@@ -7,7 +7,6 @@ and step-by-step remediation guides written in plain language.
 
 from typing import Dict, Optional
 
-
 # ── ATT&CK Technique Descriptions (plain language) ─────────────
 
 TECHNIQUE_INFO: Dict[str, Dict[str, str]] = {

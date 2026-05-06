@@ -13,7 +13,7 @@ from html import escape
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from core.models import RiskLevel, ScanResult, ScanSummary
+from core.models import ScanResult, ScanSummary
 
 logger = logging.getLogger(__name__)
 

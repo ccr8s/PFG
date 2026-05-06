@@ -7,7 +7,6 @@ attract attackers. Any access to these files triggers an alert.
 
 import json
 import logging
-import os
 import uuid
 from datetime import datetime
 from pathlib import Path

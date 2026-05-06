@@ -15,16 +15,20 @@ Examples:
     python main.py scan . --export-stix findings.json
     python main.py forensics --event-logs --registry
     python main.py --gui
+
+Exit codes:
+    0   success / no critical findings
+    1   usage error or unimplemented feature
+    2   critical findings or SafetyError
+    130 interrupted (Ctrl+C)
 """
 
 import argparse
 import json
 import logging
-import sys
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict
 
-from rich import print as rprint
 from rich.console import Console
 from rich.panel import Panel
 from rich.progress import BarColumn, Progress, SpinnerColumn, TextColumn
@@ -32,7 +36,7 @@ from rich.table import Table
 
 from core.base import ConfigManager
 from utils.logging_config import setup_logging
-from utils.safety import apply_config_overrides
+from utils.safety import SafetyError, apply_config_overrides
 
 console = Console()
 logger = logging.getLogger(__name__)
@@ -177,6 +181,11 @@ Examples:
         action="store_true",
         help="Publish findings to configured TAXII servers",
     )
+    scan_output.add_argument(
+        "--no-save",
+        action="store_true",
+        help="Do not persist results to the SQLite database",
+    )
 
     # ----- FORENSICS COMMAND -----
     forensics_parser = subparsers.add_parser(
@@ -292,6 +301,9 @@ Examples:
 
 def handle_scan(args: argparse.Namespace) -> int:
     """Handle the scan command."""
+    import uuid
+    from datetime import datetime
+
     console.print(Panel.fit(
         "[bold blue]FileGuard Security Scanner[/bold blue]\n"
         f"Target: {args.path.absolute()}",
@@ -305,8 +317,9 @@ def handle_scan(args: argparse.Namespace) -> int:
 
     # Lazy imports for scan modules (not yet implemented)
     try:
-        from core.scanner import FileScanner
+        from core.models import ScanSummary
         from core.risk_classifier import RiskClassifier
+        from core.scanner import FileScanner
     except ImportError:
         console.print(
             "[yellow]Warning:[/yellow] Scan engine not yet implemented. "
@@ -325,7 +338,10 @@ def handle_scan(args: argparse.Namespace) -> int:
         config=ConfigManager().config,
     )
 
-    # Run scan with progress
+    # Stream scan results so the progress bar still updates per file,
+    # then assemble a ScanSummary for persistence and exports.
+    scan_id = str(uuid.uuid4())[:8]
+    start_time = datetime.now()
     results = []
     with Progress(
         SpinnerColumn(),
@@ -343,12 +359,44 @@ def handle_scan(args: argparse.Namespace) -> int:
                 description=f"Scanning: {result.file_path.name[:40]}",
             )
 
+    summary = ScanSummary(
+        scan_id=scan_id,
+        start_time=start_time,
+        end_time=datetime.now(),
+        target_path=args.path,
+        total_files=(
+            scanner.stats["scanned"]
+            + scanner.stats["skipped"]
+            + scanner.stats["errors"]
+        ),
+        files_scanned=scanner.stats["scanned"],
+        files_skipped=scanner.stats["skipped"],
+        files_error=scanner.stats["errors"],
+        results=results,
+    )
+
     # Classify results
     classifier = RiskClassifier()
     classified = classifier.classify_results(results)
 
     # Display results table
     display_results_table(classified)
+
+    # Persist to SQLite by default. Failures here should not abort
+    # the rest of the scan output.
+    if not args.no_save:
+        try:
+            from core.database import Database
+            with Database() as db:
+                db.save_scan(summary)
+            console.print(
+                f"[green]OK[/green] Saved to DB "
+                f"(scan_id={summary.scan_id})"
+            )
+        except Exception as e:
+            console.print(
+                f"[yellow]Warning:[/yellow] Failed to persist scan: {e}"
+            )
 
     # Handle exports
     if args.output:
@@ -390,12 +438,12 @@ def handle_scan(args: argparse.Namespace) -> int:
 
 def handle_forensics(args: argparse.Namespace) -> int:
     """Handle the forensics command."""
-    from forensics.event_logs import EventLogAnalyzer
-    from forensics.registry import RegistryAnalyzer
-    from forensics.timestomp import TimestompDetector
-    from forensics.prefetch import PrefetchParser
     from forensics.amcache import AmcacheParser
     from forensics.bitmap_cache import BitmapCacheParser
+    from forensics.event_logs import EventLogAnalyzer
+    from forensics.prefetch import PrefetchParser
+    from forensics.registry import RegistryAnalyzer
+    from forensics.timestomp import TimestompDetector
 
     console.print(Panel.fit(
         "[bold yellow]FileGuard Forensics Analysis[/bold yellow]",
@@ -695,19 +743,26 @@ def main() -> int:
     config_mgr.load(args.config)
     apply_config_overrides(config_mgr.config)
 
-    # Handle GUI launch
-    if args.gui:
-        return handle_gui(args)
+    try:
+        if args.gui:
+            return handle_gui(args)
 
-    # Handle subcommands
-    if args.command == "scan":
-        return handle_scan(args)
-    elif args.command == "forensics":
-        return handle_forensics(args)
-    elif args.command == "honeypot":
-        return handle_honeypot(args)
-    elif args.command == "config":
-        return handle_config(args)
-    else:
-        parser.print_help()
-        return 0
+        if args.command == "scan":
+            return handle_scan(args)
+        elif args.command == "forensics":
+            return handle_forensics(args)
+        elif args.command == "honeypot":
+            return handle_honeypot(args)
+        elif args.command == "config":
+            return handle_config(args)
+        else:
+            parser.print_help()
+            return 0
+    except SafetyError as e:
+        console.print(f"[bold red]Safety error:[/bold red] {e}")
+        if args.verbose:
+            console.print_exception()
+        return 2
+    except KeyboardInterrupt:
+        console.print("\n[yellow]Interrupted.[/yellow]")
+        return 130

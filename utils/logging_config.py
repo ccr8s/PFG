@@ -9,7 +9,6 @@ import sys
 from pathlib import Path
 from typing import List, Optional
 
-
 # Log format constants
 LOG_FORMAT = "%(asctime)s [%(levelname)s] %(name)s: %(message)s"
 LOG_FORMAT_DEBUG = (

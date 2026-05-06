@@ -245,8 +245,9 @@ class EventLogAnalyzer(BaseForensicModule):
             return findings
 
         try:
-            import Evtx.Evtx as evtx
             import xml.etree.ElementTree as ET
+
+            import Evtx.Evtx as evtx
 
             entries: List[Dict[str, Any]] = []
 

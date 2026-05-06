@@ -6,10 +6,9 @@ evidence of RDP sessions, which may indicate lateral movement.
 """
 
 import logging
-import struct
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import List
 
 from core.base import BaseForensicModule
 from core.models import ForensicFinding

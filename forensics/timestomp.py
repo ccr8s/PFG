@@ -6,10 +6,9 @@ deliberate manipulation to evade forensic analysis.
 """
 
 import logging
-import os
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Dict, List
 
 from core.base import BaseForensicModule
 from core.models import ForensicFinding
@@ -109,7 +108,6 @@ class TimestompDetector(BaseForensicModule):
             stat = file_path.stat()
             created = datetime.fromtimestamp(stat.st_ctime)
             modified = datetime.fromtimestamp(stat.st_mtime)
-            accessed = datetime.fromtimestamp(stat.st_atime)
             now = datetime.now()
 
         except (OSError, PermissionError, OverflowError) as e:

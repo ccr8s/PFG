@@ -8,7 +8,7 @@ payloads alongside legitimate files.
 import logging
 import subprocess
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import List, Optional
 
 from core.base import BaseDetector
 from core.models import Finding
@@ -122,7 +122,11 @@ class ADSScanner(BaseDetector):
         Enumerate all data streams on a file.
 
         Uses the Windows dir /r command to find ADS, or falls back
-        to the Python ctypes approach.
+        to the Python ctypes approach when the subprocess invocation
+        itself fails (not merely when it returns no streams - a clean
+        file legitimately has none, and re-running ctypes on every
+        clean file in a tree is the path that historically caused
+        access violations).
 
         Args:
             file_path: Path to check.
@@ -131,9 +135,9 @@ class ADSScanner(BaseDetector):
             List of (stream_name, stream_size) tuples.
         """
         streams: List[tuple] = []
+        subprocess_ok = False
 
         try:
-            # Use dir /r to enumerate streams
             result = subprocess.run(
                 ["cmd", "/c", "dir", "/r", str(file_path)],
                 capture_output=True,
@@ -142,8 +146,9 @@ class ADSScanner(BaseDetector):
                 creationflags=subprocess.CREATE_NO_WINDOW
                 if hasattr(subprocess, "CREATE_NO_WINDOW") else 0,
             )
+            subprocess_ok = result.returncode == 0
 
-            if result.returncode == 0:
+            if subprocess_ok:
                 for line in result.stdout.splitlines():
                     line = line.strip()
                     # ADS lines look like: "  123 filename.txt:stream_name:$DATA"
@@ -153,7 +158,6 @@ class ADSScanner(BaseDetector):
                             try:
                                 size = int(parts[0].replace(",", ""))
                                 name_part = parts[-1]
-                                # Extract stream name between colons
                                 stream_parts = name_part.split(":")
                                 if len(stream_parts) >= 2:
                                     stream_name = stream_parts[1]
@@ -164,8 +168,7 @@ class ADSScanner(BaseDetector):
         except (subprocess.TimeoutExpired, FileNotFoundError, OSError) as e:
             self.logger.debug("dir /r failed: %s", e)
 
-        # Fallback: try using ctypes FindFirstStreamW
-        if not streams:
+        if not subprocess_ok:
             streams = self._enumerate_streams_ctypes(file_path)
 
         return streams
@@ -175,6 +178,12 @@ class ADSScanner(BaseDetector):
     ) -> List[tuple]:
         """
         Enumerate streams using Windows API via ctypes.
+
+        Note: HANDLE return values are pointer-sized. ctypes defaults
+        the return type to c_int (32-bit signed), which truncates the
+        pointer on 64-bit Windows and turns the next FindNextStreamW
+        / FindClose call into an access violation. We must declare
+        argtypes / restype explicitly.
 
         Args:
             file_path: Path to check.
@@ -186,48 +195,88 @@ class ADSScanner(BaseDetector):
 
         try:
             import ctypes
-            import ctypes.wintypes
+            from ctypes import wintypes
+        except ImportError as e:
+            self.logger.debug("ctypes unavailable: %s", e)
+            return streams
 
+        try:
             kernel32 = ctypes.windll.kernel32
+        except (AttributeError, OSError) as e:
+            self.logger.debug("kernel32 unavailable: %s", e)
+            return streams
 
-            class WIN32_FIND_STREAM_DATA(ctypes.Structure):
-                _fields_ = [
-                    ("StreamSize", ctypes.c_longlong),
-                    ("cStreamName", ctypes.c_wchar * 296),
-                ]
+        HANDLE = wintypes.HANDLE
 
-            find_data = WIN32_FIND_STREAM_DATA()
-            handle = kernel32.FindFirstStreamW(
+        class WIN32_FIND_STREAM_DATA(ctypes.Structure):
+            _fields_ = [
+                ("StreamSize", ctypes.c_longlong),
+                ("cStreamName", ctypes.c_wchar * 296),
+            ]
+
+        try:
+            find_first = kernel32.FindFirstStreamW
+            find_first.restype = HANDLE
+            find_first.argtypes = [
+                wintypes.LPCWSTR,
+                ctypes.c_int,
+                ctypes.c_void_p,
+                wintypes.DWORD,
+            ]
+
+            find_next = kernel32.FindNextStreamW
+            find_next.restype = wintypes.BOOL
+            find_next.argtypes = [HANDLE, ctypes.c_void_p]
+
+            find_close = kernel32.FindClose
+            find_close.restype = wintypes.BOOL
+            find_close.argtypes = [HANDLE]
+        except (AttributeError, OSError) as e:
+            self.logger.debug("FindFirstStreamW unavailable: %s", e)
+            return streams
+
+        INVALID_HANDLE_VALUE = wintypes.HANDLE(-1).value
+
+        find_data = WIN32_FIND_STREAM_DATA()
+        try:
+            handle = find_first(
                 str(file_path),
                 0,  # FindStreamInfoStandard
                 ctypes.byref(find_data),
                 0,
             )
+        except OSError as e:
+            self.logger.debug("FindFirstStreamW raised: %s", e)
+            return streams
 
-            INVALID_HANDLE = ctypes.c_void_p(-1).value
-            if handle == INVALID_HANDLE:
-                return streams
+        if not handle or handle == INVALID_HANDLE_VALUE:
+            return streams
 
-            try:
-                while True:
+        try:
+            while True:
+                try:
                     name = find_data.cStreamName
                     size = find_data.StreamSize
+                except OSError as e:
+                    self.logger.debug("stream data read failed: %s", e)
+                    break
 
-                    # Skip main ::$DATA stream
-                    if name != "::$DATA" and ":$DATA" in name:
-                        clean = name.replace(":$DATA", "").strip(":")
-                        if clean:
-                            streams.append((clean, size))
+                if name != "::$DATA" and ":$DATA" in name:
+                    clean = name.replace(":$DATA", "").strip(":")
+                    if clean:
+                        streams.append((clean, size))
 
-                    if not kernel32.FindNextStreamW(
-                        handle, ctypes.byref(find_data)
-                    ):
+                try:
+                    if not find_next(handle, ctypes.byref(find_data)):
                         break
-            finally:
-                kernel32.FindClose(handle)
-
-        except (ImportError, AttributeError, OSError) as e:
-            self.logger.debug("ctypes stream enumeration failed: %s", e)
+                except OSError as e:
+                    self.logger.debug("FindNextStreamW raised: %s", e)
+                    break
+        finally:
+            try:
+                find_close(handle)
+            except OSError as e:
+                self.logger.debug("FindClose raised: %s", e)
 
         return streams
 

@@ -17,7 +17,6 @@ from core.base import (
 )
 from core.models import Finding, ForensicFinding
 
-
 # ---------------------------------------------------------------------------
 # Concrete implementations for testing abstract classes
 # ---------------------------------------------------------------------------

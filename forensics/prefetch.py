@@ -7,9 +7,9 @@ identifying suspicious executables that have run on the system.
 
 import logging
 import struct
-from datetime import datetime, timedelta
+from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 from core.base import BaseForensicModule
 from core.models import ForensicFinding

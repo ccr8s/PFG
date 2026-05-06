@@ -7,7 +7,6 @@ access attempts and generate real-time alerts.
 
 import logging
 import threading
-import time
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
@@ -51,8 +50,8 @@ class HoneypotMonitor:
     def start(self) -> None:
         """Start monitoring all deployed decoy directories."""
         try:
-            from watchdog.observers import Observer
             from watchdog.events import FileSystemEventHandler
+            from watchdog.observers import Observer
         except ImportError:
             logger.error(
                 "watchdog not installed - honeypot monitoring unavailable"

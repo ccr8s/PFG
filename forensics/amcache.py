@@ -7,9 +7,8 @@ registry entries to identify program execution history.
 
 import logging
 import struct
-from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 from core.base import BaseForensicModule
 from core.models import ForensicFinding
@@ -105,8 +104,8 @@ class AmcacheParser(BaseForensicModule):
             return findings
 
         try:
-            from regipy.registry import RegistryHive
             from regipy.plugins.amcache import AmCachePlugin
+            from regipy.registry import RegistryHive
 
             hive = RegistryHive(str(amcache_path))
 

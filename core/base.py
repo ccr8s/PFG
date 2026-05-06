@@ -10,7 +10,7 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from core.models import Finding, ForensicFinding, ScanResult
+from core.models import Finding, ForensicFinding
 
 logger = logging.getLogger(__name__)
 

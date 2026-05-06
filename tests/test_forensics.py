@@ -15,9 +15,9 @@ import pytest
 
 from core.models import ForensicFinding
 from forensics.event_logs import EventLogAnalyzer, _parse_timestamp
+from forensics.prefetch import PrefetchParser
 from forensics.registry import RegistryAnalyzer
 from forensics.timestomp import TimestompDetector
-from forensics.prefetch import PrefetchParser
 
 
 class TestEventLogAnalyzer:
@@ -129,14 +129,14 @@ class TestRegistryAnalyzer:
             "severity": 25,
             "technique": "T1547.001",
         }
-        finding = analyzer._assess_registry_value(
+        # Low severity values without suspicious patterns may return None
+        # because severity doesn't reach threshold; this is expected behavior.
+        # The test asserts only that the call doesn't raise.
+        analyzer._assess_registry_value(
             key_info,
             "SecurityHealth",
             r"C:\Program Files\Windows Defender\MSASCuiL.exe"
         )
-        # Low severity values without suspicious patterns may return None
-        # because severity doesn't reach threshold
-        # This is expected behavior
 
 
 class TestTimestompDetector:

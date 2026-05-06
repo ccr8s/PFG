@@ -6,7 +6,6 @@ and known malware tool patterns using the signatures database.
 """
 
 import logging
-import re
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
