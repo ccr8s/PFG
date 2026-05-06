@@ -220,7 +220,21 @@ class FileGuardApp(ctk.CTk):
         self.detail_panel = DetailPanel(self.h_paned)
         self.h_paned.add(self.detail_panel, stretch="always", minsize=150)
 
-        self.paned.add(self.h_paned, stretch="always", minsize=200)
+        # height= sets the initial pane height (tk.PanedWindow honors
+        # this on first layout). Without it, the vertical sash defaults
+        # to roughly 1/2 split which can leave the top pane too short
+        # for the detail-panel buttons. ~58% top / 42% bottom matches
+        # what most users actually want.
+        top_initial_h = max(
+            int(DIMENSIONS["window_min_height"] * 0.58),
+            420,
+        )
+        self.paned.add(
+            self.h_paned,
+            stretch="always",
+            minsize=240,
+            height=top_initial_h,
+        )
 
         # Bottom pane: per-tool tabbed notebook. The old shared
         # forensic-button bar lived here; we removed it because each

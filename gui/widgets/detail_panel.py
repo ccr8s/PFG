@@ -53,13 +53,17 @@ class DetailPanel(ctk.CTkFrame):
         self._current_result: Optional[ScanResult] = None
         self._active_detonation: Optional[Detonation] = None
 
-        # Action bar: stack buttons vertically with fill="x" so they
-        # always fit, regardless of how narrow the user has dragged the
-        # detail panel splitter. A horizontal row of 3 fixed-width
-        # buttons (140+170+180 px) gets clipped off the right edge when
-        # the panel is at its default 350 px width.
+        # Action bar: 3 buttons in a single row using grid with equal
+        # column weights and sticky="ew", so each button claims 1/3 of
+        # the action bar's width. This keeps the action bar one row
+        # tall (critical when the vertical splitter has only given the
+        # top pane a short slice) while still letting buttons scale
+        # down gracefully if the detail panel is narrow. Pack the bar
+        # at the bottom (side="bottom") so it gets reserved space
+        # before the expanding detail_text claims everything else.
         self.action_bar = ctk.CTkFrame(self, fg_color="transparent")
-        self.action_bar.pack(fill="x", padx=6, pady=(4, 6))
+        self.action_bar.pack(side="bottom", fill="x", padx=6, pady=(4, 6))
+        self.action_bar.grid_columnconfigure((0, 1, 2), weight=1, uniform="btns")
 
         self.btn_preview = ctk.CTkButton(
             self.action_bar,
@@ -68,7 +72,7 @@ class DetailPanel(ctk.CTkFrame):
             state="disabled",
             height=32,
         )
-        self.btn_preview.pack(fill="x", pady=(0, 4))
+        self.btn_preview.grid(row=0, column=0, sticky="ew", padx=(0, 3))
 
         self.btn_hex = ctk.CTkButton(
             self.action_bar,
@@ -79,7 +83,7 @@ class DetailPanel(ctk.CTkFrame):
             hover_color="#1f618d",
             height=32,
         )
-        self.btn_hex.pack(fill="x", pady=(0, 4))
+        self.btn_hex.grid(row=0, column=1, sticky="ew", padx=3)
         ToolTip(
             self.btn_hex,
             "Open the file in a hex editor (read bytes only - no code "
@@ -96,7 +100,7 @@ class DetailPanel(ctk.CTkFrame):
             hover_color="#7b241c",
             height=32,
         )
-        self.btn_detonate.pack(fill="x")
+        self.btn_detonate.grid(row=0, column=2, sticky="ew", padx=(3, 0))
 
         self._sandbox_available = is_sandbox_available()
         self._sandbox_reason = (
