@@ -18,7 +18,7 @@ import customtkinter as ctk
 
 from core.models import ScanResult, ScanSummary
 from gui.styles import COLORS, DIMENSIONS, FONTS
-from gui.widgets import DetailPanel, RiskColumn
+from gui.widgets import DetailPanel, HoneypotTab, RiskColumn, ToolTab
 
 logger = logging.getLogger(__name__)
 
@@ -193,36 +193,25 @@ class FileGuardApp(ctk.CTk):
 
         self.paned.add(self.h_paned, stretch="always", minsize=200)
 
-        # Bottom pane: forensics bar + info text
+        # Bottom pane: per-tool tabbed notebook. The old shared
+        # forensic-button bar lived here; we removed it because each
+        # tab now owns its own Start button so the user runs a tool
+        # from inside the tab they're already looking at.
         self.bottom_frame = ctk.CTkFrame(self.paned)
 
-        # Forensics toolbar
-        forensic_bar = ctk.CTkFrame(self.bottom_frame)
-        forensic_bar.pack(fill="x", padx=4, pady=(4, 0))
-
-        for label in [
+        self._tool_labels = [
             "Event Logs", "Registry", "Timestamps",
             "Prefetch", "Amcache", "Bitmap Cache",
-        ]:
-            ctk.CTkButton(
-                forensic_bar,
-                text=label,
-                font=FONTS["button"],
-                width=120,
-                height=34,
-                command=lambda lab=label: self._run_forensic(lab),
-            ).pack(side="left", padx=2, pady=2)
+            "Honeypot",
+        ]
 
-        # Information text area
-        self.info_text = ctk.CTkTextbox(
-            self.bottom_frame,
-            font=FONTS["mono_small"],
-            wrap="word",
-        )
-        self.info_text.pack(fill="both", expand=True, padx=4, pady=4)
-        self._info_write("FileGuard ready. Click 'Start Scan' to begin.\n")
+        self._build_tool_notebook()
 
         self.paned.add(self.bottom_frame, stretch="always", minsize=100)
+
+        # Initial Activity-tab message kept for parity with the old
+        # single-textbox layout.
+        self._info_write("FileGuard ready. Click 'Start Scan' to begin.\n")
 
     # ── Scan Controls ──────────────────────────────────────────
 
@@ -540,8 +529,14 @@ class FileGuardApp(ctk.CTk):
             messagebox.showerror("Export Error", str(e))
 
     def _run_forensic(self, module_name: str) -> None:
-        """Run a forensic analysis module."""
-        self._info_write(f"\nRunning {module_name} analysis...\n")
+        """Run a forensic analysis module and route output to its tab."""
+        tab = self.tool_tabs.get(module_name)
+        if tab is None:
+            logger.warning("No tab for forensic tool: %s", module_name)
+            return
+
+        tab.set_running()
+        self._info_write(f"Running {module_name} analysis...\n")
 
         def _run() -> None:
             try:
@@ -572,20 +567,36 @@ class FileGuardApp(ctk.CTk):
                 else:
                     findings = []
 
-                self.after(
-                    0,
-                    self._info_write,
-                    f"  {module_name}: {len(findings)} findings\n",
-                )
+                self.after(0, self._on_forensic_done, module_name, findings, None)
 
             except Exception as e:
-                self.after(
-                    0,
-                    self._info_write,
-                    f"  {module_name} error: {e}\n",
-                )
+                logger.exception("Forensic tool %s failed", module_name)
+                self.after(0, self._on_forensic_done, module_name, [], str(e))
 
         threading.Thread(target=_run, daemon=True).start()
+
+    def _on_forensic_done(
+        self,
+        module_name: str,
+        findings: list,
+        err: Optional[str],
+    ) -> None:
+        """Main-thread continuation of :meth:`_run_forensic`."""
+        tab = self.tool_tabs.get(module_name)
+        if tab is None:
+            return
+        if err is not None:
+            tab.set_error(
+                f"{module_name} failed:\n\n{err}\n\n"
+                "If this requires elevated privileges, try running "
+                "FileGuard from an Administrator terminal."
+            )
+            self._info_write(f"  {module_name} error: {err}\n")
+            return
+        tab.set_results(findings)
+        self._info_write(
+            f"  {module_name}: {len(findings)} finding(s)\n"
+        )
 
     # ── Helpers ────────────────────────────────────────────────
 
@@ -594,9 +605,106 @@ class FileGuardApp(ctk.CTk):
         self.lbl_status.configure(text=text)
 
     def _info_write(self, text: str) -> None:
-        """Append text to the info panel."""
-        self.info_text.insert("end", text)
-        self.info_text.see("end")
+        """Append text to the Activity tab.
+
+        Kept for back-compat with all the existing call-sites that
+        wrote scan progress, sandbox close logs, etc. into the old
+        shared CTkTextbox. Now routes everything into the first tab
+        of the notebook.
+        """
+        try:
+            self.activity_text.configure(state="normal")
+            self.activity_text.insert("end", text)
+            self.activity_text.see("end")
+            self.activity_text.configure(state="disabled")
+        except Exception:
+            pass
+
+    # ── Tool notebook ──────────────────────────────────────────
+
+    def _build_tool_notebook(self) -> None:
+        """Replace the old shared CTkTextbox with a tk.ttk.Notebook.
+
+        Every forensic tool gets its own tab so output from one tool
+        no longer overwrites another's. The first tab ("Activity") is
+        the legacy ``_info_write`` sink: scan progress, startup
+        messages, sandbox-close logs, etc. all land there.
+        """
+        import tkinter as tk
+        from tkinter import ttk
+
+        style = ttk.Style(self)
+        try:
+            style.theme_use("clam")
+        except tk.TclError:
+            pass
+        style.configure(
+            "Tools.TNotebook", background="#1a1a2e", borderwidth=0
+        )
+        style.configure(
+            "Tools.TNotebook.Tab",
+            background="#16213e",
+            foreground="#e8e8e8",
+            padding=(14, 6),
+            font=("Segoe UI", 10, "bold"),
+        )
+        style.map(
+            "Tools.TNotebook.Tab",
+            background=[("selected", "#0f3460")],
+            foreground=[("selected", "#00adb5")],
+        )
+
+        self.tool_notebook = ttk.Notebook(
+            self.bottom_frame, style="Tools.TNotebook"
+        )
+        self.tool_notebook.pack(fill="both", expand=True, padx=4, pady=4)
+
+        # Tab 0: Activity (legacy info_write sink)
+        activity_frame = tk.Frame(self.tool_notebook, bg="#1a1a2e")
+        self.activity_text = tk.Text(
+            activity_frame,
+            bg="#0f1020",
+            fg="#e8e8e8",
+            insertbackground="#e8e8e8",
+            selectbackground="#2c3e50",
+            relief="flat",
+            padx=10,
+            pady=8,
+            wrap="word",
+            font=("Consolas", 10),
+            cursor="arrow",
+            state="disabled",
+        )
+        yscroll = tk.Scrollbar(
+            activity_frame, orient="vertical", command=self.activity_text.yview
+        )
+        self.activity_text.configure(yscrollcommand=yscroll.set)
+        yscroll.pack(side="right", fill="y")
+        self.activity_text.pack(fill="both", expand=True)
+        self.tool_notebook.add(activity_frame, text="Activity")
+
+        # Compatibility alias: a few old call sites still reference
+        # ``self.info_text`` directly. Point it at the Activity Text.
+        self.info_text = self.activity_text
+
+        # Tabs 1-6: one ToolTab per read-only forensic tool. Each
+        # tab owns its own Start button which calls _run_forensic
+        # directly.
+        self.tool_tabs: Dict[str, ToolTab] = {}
+        for label in self._tool_labels:
+            if label == "Honeypot":
+                continue
+            tab = ToolTab(
+                self.tool_notebook,
+                label,
+                on_start=lambda lab=label: self._run_forensic(lab),
+            )
+            self.tool_notebook.add(tab, text=label)
+            self.tool_tabs[label] = tab
+
+        # Tab 7: Honeypot (interactive, not a ToolTab).
+        self.honeypot_tab = HoneypotTab(self.tool_notebook)
+        self.tool_notebook.add(self.honeypot_tab, text="Honeypot")
 
     # ── Shutdown ───────────────────────────────────────────────
 
@@ -632,6 +740,13 @@ class FileGuardApp(ctk.CTk):
                 terminate_all()
         except Exception:
             logger.exception("Sandbox cleanup on app close failed")
+
+        try:
+            if hasattr(self, "honeypot_tab") and self.honeypot_tab.is_monitoring():
+                self.honeypot_tab.stop_monitoring()
+                logger.info("App close: stopped honeypot monitor")
+        except Exception:
+            logger.exception("Honeypot monitor stop on app close failed")
 
         try:
             self.destroy()

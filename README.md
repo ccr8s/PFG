@@ -95,6 +95,12 @@ python main.py honeypot --remove     # clean up
 python main.py --gui
 ```
 
+The bottom panel hosts a tabbed view: an `Activity` log, one tab per forensic tool (Event Logs, Registry, Timestamps, Prefetch, Amcache, Bitmap Cache), and a `Honeypot` tab with a built-in tutorial plus Deploy / Remove / Choose-decoys / **Start monitoring** controls and a live alerts panel. Each forensic tab carries its own `Run` button, so output from one tool no longer overwrites another's.
+
+#### Honeypot monitoring caveat
+
+The Honeypot tab uses [`watchdog`](https://pypi.org/project/watchdog/) under the hood, which on Windows is implemented over `ReadDirectoryChangesW`. That API only fires for **modify / create / delete / rename** events - simply opening a decoy to read it is invisible at this layer (you'd need ETW or a kernel mini-filter for read detection). In practice this is fine: ransomware encrypts (modify), wipers delete, and infostealers usually copy then delete - all of which fire alerts. A user double-clicking and just closing without saving will not.
+
 ### Configuration
 
 ```powershell
@@ -111,7 +117,14 @@ This tool reads sensitive areas of the filesystem and can deploy real decoys. Ev
 
 1. **Path safety** — writes are rejected for protected paths (`C:\Windows`, `C:\Program Files`, AppData, etc.).
 2. **Testing mode** — when on, scans are restricted to the sandbox (`C:\FileGuardTest\mock_system`) and the project directory.
-3. **Read-only mode** — when on, writes are silently blocked except for explicit operations (e.g. honeypot deployment).
+3. **Read-only mode** — when on, `safe_write` / `safe_delete` are silent no-ops. Reads are always allowed; honeypot deploy/remove opts in explicitly via `force=True`, so it still works.
+
+### Defaults
+
+| Setting | Default | What it does |
+|---|---|---|
+| `testing_mode` | `false` | Real-path scanning works out of the box. Set `true` to hard-restrict scans to the sandbox/project dir during development. |
+| `read_only` | `true` | Belt-and-suspenders against accidental writes. Does **not** block scanning. Honeypot deploy still works because it passes `force=True`. |
 
 Resolution order (highest priority first):
 
@@ -121,13 +134,16 @@ ENV vars  →  config/settings.yaml  →  built-in defaults
 
 Relevant env vars: `FILEGUARD_TESTING`, `FILEGUARD_READONLY`, `FILEGUARD_SANDBOX`.
 
-To scan real paths from a fresh shell:
+### Reverting to sandbox-only mode
+
+If you want to hard-restrict scans to `C:\FileGuardTest\mock_system` and the project directory (e.g. for development on this codebase):
 
 ```powershell
-$env:FILEGUARD_TESTING="false"
-$env:FILEGUARD_READONLY="false"
-python main.py scan C:\some\real\path
+$env:FILEGUARD_TESTING="true"
+python main.py --gui
 ```
+
+Or flip `safety.testing_mode: true` in `config/settings.yaml` to make it the persistent default.
 
 ---
 

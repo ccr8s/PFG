@@ -97,12 +97,17 @@ class DecoyManager:
     def deploy_decoys(
         self,
         locations: Optional[List[Path]] = None,
+        decoys: Optional[List[Dict[str, Any]]] = None,
     ) -> List[Path]:
         """
         Deploy decoy files to specified locations.
 
         Args:
             locations: Custom locations. Defaults to Desktop/Documents/Downloads.
+            decoys: Custom decoy definitions. When supplied, only these are
+                created (instead of :data:`DEFAULT_DECOYS`). Each entry must
+                have at minimum ``name`` and ``content_type`` keys; ``desc``
+                is optional and falls back to "Custom decoy".
 
         Returns:
             List of paths where decoys were deployed.
@@ -114,6 +119,8 @@ class DecoyManager:
         else:
             target_dirs = self._get_default_locations()
 
+        decoy_defs = decoys if decoys else DEFAULT_DECOYS
+
         for target_dir in target_dirs:
             if not target_dir.exists():
                 logger.debug("Skipping nonexistent location: %s", target_dir)
@@ -123,7 +130,7 @@ class DecoyManager:
                 logger.warning("Skipping unsafe location: %s", target_dir)
                 continue
 
-            for decoy_def in DEFAULT_DECOYS:
+            for decoy_def in decoy_defs:
                 decoy_path = target_dir / decoy_def["name"]
 
                 if decoy_path.exists():
@@ -142,7 +149,9 @@ class DecoyManager:
                         "id": str(uuid.uuid4())[:8],
                         "path": str(decoy_path),
                         "name": decoy_def["name"],
-                        "description": decoy_def["desc"],
+                        "description": decoy_def.get(
+                            "desc", "Custom decoy"
+                        ),
                         "deployed_at": datetime.now().isoformat(),
                         "size": len(content),
                     })

@@ -7,6 +7,54 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Honeypot real-time monitoring wired into the GUI. The `Honeypot`
+  tab now has a `Start monitoring` / `Stop monitoring` toggle and a
+  live alerts panel below the status box. Alerts come from
+  `honeypot.monitor.HoneypotMonitor` (watchdog-based) and are
+  marshalled onto the Tk main thread via an `alert_callback`. The
+  monitor is auto-stopped from `FileGuardApp._on_close_window` so
+  watchdog observers don't leak on app exit. Tutorial text updated
+  to explain that Windows file-system events cover modify / create
+  / delete / rename but not pure reads. Tests in
+  `tests/test_honeypot_tab.py` cover toggle, abort-when-no-decoys,
+  alert rendering, and failed-start state reset.
+
+- Per-tool `Run` buttons. The shared forensic-tool button bar at
+  the top of the GUI was removed; each `ToolTab` (Event Logs,
+  Registry, Timestamps, Prefetch, Amcache, Bitmap Cache) now owns
+  its own green `Run <tool>` button in an action bar, so the start
+  control sits next to the output it produces. `_run_forensic`
+  was refactored to take an explicit tool name and look the tab up
+  by key.
+
+- Per-tool tabs in the bottom panel. Each forensic tool (Event Logs,
+  Registry, Timestamps, Prefetch, Amcache, Bitmap Cache) now writes
+  into its own dedicated tab inside a `ttk.Notebook`, so output from
+  one tool no longer overwrites another's. The legacy `_info_write`
+  sink (scan progress, sandbox-close logs, startup messages) lives
+  in the new `Activity` tab. Implemented via new `gui/widgets/tool_tab.py`.
+- New `Honeypot` tab and forensic-bar button. Beginner-friendly
+  tutorial in plain English explains what a honeypot is and how it
+  helps, followed by `Deploy decoys`, `Remove all decoys`, and
+  `Choose decoy files...` buttons. The chooser opens a checkbox
+  modal pre-filled with the eight default templates plus a custom-
+  filename entry, so users can scatter only the decoys they want.
+  Status pane lists each deployed path with `*`/`x`/`+` markers for
+  active / missing / just-deployed. Implemented in
+  `gui/widgets/honeypot_tab.py`.
+- `DecoyManager.deploy_decoys(decoys=...)` parameter for custom
+  decoy lists. When supplied, only the listed decoys are created;
+  empty list falls back to `DEFAULT_DECOYS`. Backwards-compatible.
+
+### Changed
+- Default `safety.testing_mode` flipped from `true` to `false` in
+  `config/settings.yaml`. Real-path scanning works out of the box
+  now; sandbox-only mode is opt-in via `FILEGUARD_TESTING=true` or
+  the YAML override. `read_only` stays `true` as defense in depth -
+  it doesn't block scanning, and honeypot deploy/remove explicitly
+  pass `force=True` so they keep working.
+
 ### Fixed
 - ADS scanner ctypes access violation on 64-bit Windows. `FindFirstStreamW`,
   `FindNextStreamW`, and `FindClose` now declare `argtypes`/`restype` so the

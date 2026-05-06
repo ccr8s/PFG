@@ -99,10 +99,23 @@ taxii:
   enabled: false
   servers: []
 
-# Safety settings (DO NOT CHANGE IN PRODUCTION)
+# Safety settings
+#
+# testing_mode (default: false)
+#   When true, scans are restricted to the sandbox path below and to
+#   the project directory. Set true if you want a hard guard against
+#   accidentally scanning real disks during development.
+#
+# read_only (default: true)
+#   When true, safe_write/safe_delete are no-ops unless callers pass
+#   force=True. Honeypot deployment / removal explicitly opt in via
+#   force=True so they work either way. Leave on for defense in
+#   depth - it does not block scanning.
+#
+# Override either via env vars: FILEGUARD_TESTING, FILEGUARD_READONLY.
 safety:
   sandbox_root: "C:\\FileGuardTest\\mock_system"
-  testing_mode: true
+  testing_mode: false
   read_only: true
 
 # GUI settings
