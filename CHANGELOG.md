@@ -21,6 +21,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   contains `datetime` values; `json.dumps` is now invoked with
   `default=str`.
 
+### Changed
+- GUI now streams flagged files into their risk columns in real time
+  as the scan finds them, instead of dumping everything at the end.
+  Side-benefit: when you hit Stop mid-scan, the partial results
+  already populated stay put for review - no end-of-scan dump that
+  could fail to deliver them.
+
 ### Added
 - GUI Stop button now actually halts a running scan. Implemented via
   a `threading.Event` plumbed through `FileScanner.scan(cancel_event=)`.

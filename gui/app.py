@@ -281,6 +281,10 @@ class FileGuardApp(ctk.CTk):
                 cancel_event=self._cancel_event,
             ):
                 results.append(result)
+                # Stream the flagged file into its risk column as soon
+                # as it's classified, so partial results are visible
+                # mid-scan and survive a Stop.
+                self.after(0, self._add_live_result, result)
 
             summary = ScanSummary(
                 scan_id=scan_id,
@@ -350,13 +354,26 @@ class FileGuardApp(ctk.CTk):
             )
         self._cancel_event = None
 
-    def _display_results(self, summary: ScanSummary) -> None:
-        """Populate the risk columns from scan results."""
-        for result in summary.results:
-            risk_name = result.risk_level.name
-            if risk_name in self.risk_columns:
-                self.risk_columns[risk_name].add_file(result)
+    def _add_live_result(self, result: ScanResult) -> None:
+        """Add a single result to its risk column on the main thread.
 
+        Called per yielded ScanResult while the scan is still running
+        so the user sees flagged files appearing immediately. The
+        partial population also survives a Stop - any results already
+        added to columns stay there for review.
+        """
+        risk_name = result.risk_level.name
+        column = self.risk_columns.get(risk_name)
+        if column is not None:
+            column.add_file(result)
+
+    def _display_results(self, summary: ScanSummary) -> None:
+        """Write the end-of-scan summary to the info panel.
+
+        Columns were already populated incrementally via
+        :meth:`_add_live_result`; this method only emits the summary
+        text so we don't duplicate entries.
+        """
         counts = summary.risk_counts
         self._info_write(
             f"\nScan complete: {summary.files_scanned} files, "
